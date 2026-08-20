@@ -24,7 +24,7 @@ if nom_ville.strip():
             region = spot.get("admin1", "")
             pays = spot.get("country", "")
             nom_emplacement = f"{spot['name']} ({region}, {pays})"
-            st.success(f"🎯 Localisation : **{nom_emplacement}** — Lat: `{lat:.4f}`, Lon: `{lon:.4f}`")
+            st.success(f"🎯 Localisation : **{nom_emplacement}** — Lat : `{lat:.4f}`, Lon : `{lon:.4f}`")
         else:
             st.warning(f"Aucune localité trouvée pour « {nom_ville} ». Position par défaut retenue.")
     except Exception:
@@ -155,17 +155,23 @@ try:
         donnees_analysees = [analyser_creneau(row, df_future, i) for i, row in df_future.iterrows()]
         df_resultats = pd.DataFrame(donnees_analysees)
 
-        # Carte de synthèse au sommet
-        prochain = df_resultats.iloc[0]
-        statut_prochain = prochain["🚦 Décision"]
-        dir_prochaine = prochain["🧭 Direction"]
+        # Recherche ciblée des créneaux "Vol optimal"
+        df_verts = df_resultats[df_resultats["🚦 Décision"].str.contains("Vol optimal", na=False)]
 
-        if "🟢" in statut_prochain:
-            st.success(f"### 🟢 Prochain créneau : {statut_prochain}\n**Vent du secteur :** {dir_prochaine}")
-        elif "🟠" in statut_prochain:
-            st.warning(f"### 🟠 Prochain créneau : {statut_prochain}\n**Vent du secteur :** {dir_prochaine}")
+        if not df_verts.empty:
+            prochain_vert = df_verts.iloc[0]
+            heures_vertes = " | ".join(df_verts["⏱️ Heure"].apply(lambda x: x.split()[0]).tolist())
+            st.success(
+                f"### 🟢 Prochain créneau optimal : {prochain_vert['🚦 Décision']}\n"
+                f"**Vent du secteur :** {prochain_vert['🧭 Direction']}\n\n"
+                f"✨ **Créneaux vol optimal à venir :** {heures_vertes}"
+            )
         else:
-            st.error(f"### 🔴 Prochain créneau : {statut_prochain}\n**Vent du secteur :** {dir_prochaine}")
+            prochain = df_resultats.iloc[0]
+            if "🟠" in prochain["🚦 Décision"]:
+                st.warning(f"### 🟠 Prochain créneau : {prochain['🚦 Décision']}\n**Vent du secteur :** {prochain['🧭 Direction']}\n\n⚠️ Aucun créneau vert idéal sur les 12h à venir.")
+            else:
+                st.error(f"### 🔴 Prochain créneau : {prochain['🚦 Décision']}\n**Vent du secteur :** {prochain['🧭 Direction']}\n\n⛔ Aucun créneau vert idéal sur les 12h à venir.")
 
         # Stylisation dynamique
         def colorier_cellule(val):
