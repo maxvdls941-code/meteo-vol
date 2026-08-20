@@ -12,11 +12,11 @@ with col1:
 with col2:
     lon = st.number_input("Longitude", value=7.4147, format="%.4f")
 
-# Interrogation de l'API Open-Meteo
+# Interrogation de l'API Open-Meteo (avec 925 hPa au lieu de 950 hPa)
 url = (
     f"https://api.open-meteo.com/v1/forecast?"
     f"latitude={lat}&longitude={lon}"
-    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,windspeed_950hpa,winddirection_950hpa"
+    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_925hpa,wind_direction_925hpa"
     f"&wind_speed_unit=kmh"
     f"&timezone=Europe%2FParis"
 )
@@ -61,8 +61,8 @@ try:
             else:
                 avis_rafales = "🔴 NO-GO"
 
-            # 3. Vent à 950 hPa (~500 m)
-            v_500 = row.get("windspeed_950hpa", row.get("wind_speed_950hpa", 0))
+            # 3. Vent en altitude (~925 hPa)
+            v_500 = row.get("wind_speed_925hpa", 0)
             if v_500 < 25:
                 avis_500 = "🟢 Vert"
             elif v_500 <= 35:
@@ -70,7 +70,7 @@ try:
             else:
                 avis_500 = "🔴 NO-GO"
 
-            # 4. Évolution de la direction
+            # 4. Évolution de la direction au sol
             dir_actuelle = row.get("wind_direction_10m", 0)
             prochaines_dirs = df_context.loc[idx:idx+2, "wind_direction_10m"] if "wind_direction_10m" in df_context.columns else []
             
@@ -99,8 +99,8 @@ try:
                 "Avis Sol": avis_sol,
                 "Écart Rafales": f"+{delta_rafales:.1f} km/h",
                 "Avis Rafales": avis_rafales,
-                "Vent 500m": f"{v_500:.1f} km/h",
-                "Avis 500m": avis_500,
+                "Vent Alt. (925hPa)": f"{v_500:.1f} km/h",
+                "Avis Alt.": avis_500,
                 "Dir. Sol": f"{dir_actuelle:.0f}° (Δ {max_diff:.0f}°)",
                 "Avis Dir.": avis_dir,
                 "Décision Globale": decision
