@@ -8,15 +8,15 @@ st.title("Aide à la décision de vol (Paramoteur / Parapente)")
 # Sélection de la position GPS
 col1, col2 = st.columns(2)
 with col1:
-    lat = st.number_input("Latitude", value=48.338470, format="%.4f")
+    lat = st.number_input("Latitude", value=48.0614, format="%.4f")
 with col2:
-    lon = st.number_input("Longitude", value=7.477790, format="%.4f")
+    lon = st.number_input("Longitude", value=7.4147, format="%.4f")
 
-# Interrogation de l'API Open-Meteo (10m, rafales, 180m altitude)
+# Interrogation de l'API Open-Meteo (Vent sol, rafales, 180m, direction et pluie)
 url = (
     f"https://api.open-meteo.com/v1/forecast?"
     f"latitude={lat}&longitude={lon}"
-    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,wind_direction_180m"
+    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,wind_direction_180m,precipitation"
     f"&wind_speed_unit=kmh"
     f"&timezone=Europe%2FParis"
 )
@@ -84,11 +84,20 @@ try:
             else:
                 avis_dir = "🔴 NO-GO"
 
+            # 5. Précipitations (Pluie)
+            pluie = row.get("precipitation", 0)
+            if pluie == 0:
+                avis_pluie = "🟢 Sec"
+            elif pluie < 0.5:
+                avis_pluie = "🟠 Risque"
+            else:
+                avis_pluie = "🔴 NO-GO"
+
             # Synthèse globale
-            tous_avis = [avis_sol, avis_rafales, avis_alt, avis_dir]
-            if "🔴 NO-GO" in tous_avis:
+            tous_avis = [avis_sol, avis_rafales, avis_alt, avis_dir, avis_pluie]
+            if any("🔴" in a for a in tous_avis):
                 decision = "🔴 NO-GO"
-            elif "🟠 Orange" in tous_avis:
+            elif any("🟠" in a for a in tous_avis):
                 decision = "🟠 Prudence"
             else:
                 decision = "🟢 Vol optimal"
@@ -102,7 +111,8 @@ try:
                 "Vent 180m": f"{v_alt:.1f} km/h",
                 "Avis 180m": avis_alt,
                 "Dir. Sol": f"{dir_actuelle:.0f}° (Δ {max_diff:.0f}°)",
-                "Avis Dir.": avis_dir,
+                "Pluie": f"{pluie:.1f} mm/h",
+                "Avis Pluie": avis_pluie,
                 "Décision Globale": decision
             }
 
