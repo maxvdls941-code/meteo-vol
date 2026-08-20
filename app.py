@@ -8,9 +8,9 @@ st.title("Aide à la décision de vol (Paramoteur / Parapente)")
 # Sélection de la position GPS
 col1, col2 = st.columns(2)
 with col1:
-    lat = st.number_input("Latitude", value=48.0614, format="%.4f")
+    lat = st.number_input("Latitude", value=48.338470, format="%.4f")
 with col2:
-    lon = st.number_input("Longitude", value=7.4147, format="%.4f")
+    lon = st.number_input("Longitude", value=7.477790, format="%.4f")
 
 # Interrogation de l'API Open-Meteo (10m, rafales, 180m altitude)
 url = (
