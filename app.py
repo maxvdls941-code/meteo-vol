@@ -12,11 +12,11 @@ with col1:
 with col2:
     lon = st.number_input("Longitude", value=7.4147, format="%.4f")
 
-# Interrogation de l'API Open-Meteo (avec 925 hPa au lieu de 950 hPa)
+# Interrogation de l'API Open-Meteo (10m, rafales, 180m altitude)
 url = (
     f"https://api.open-meteo.com/v1/forecast?"
     f"latitude={lat}&longitude={lon}"
-    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_925hpa,wind_direction_925hpa"
+    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,wind_direction_180m"
     f"&wind_speed_unit=kmh"
     f"&timezone=Europe%2FParis"
 )
@@ -61,16 +61,16 @@ try:
             else:
                 avis_rafales = "🔴 NO-GO"
 
-            # 3. Vent en altitude (~925 hPa)
-            v_500 = row.get("wind_speed_925hpa", 0)
-            if v_500 < 25:
-                avis_500 = "🟢 Vert"
-            elif v_500 <= 35:
-                avis_500 = "🟠 Orange"
+            # 3. Vent en altitude (180 m)
+            v_alt = row.get("wind_speed_180m", 0)
+            if v_alt < 25:
+                avis_alt = "🟢 Vert"
+            elif v_alt <= 35:
+                avis_alt = "🟠 Orange"
             else:
-                avis_500 = "🔴 NO-GO"
+                avis_alt = "🔴 NO-GO"
 
-            # 4. Évolution de la direction au sol
+            # 4. Évolution de la direction
             dir_actuelle = row.get("wind_direction_10m", 0)
             prochaines_dirs = df_context.loc[idx:idx+2, "wind_direction_10m"] if "wind_direction_10m" in df_context.columns else []
             
@@ -85,7 +85,7 @@ try:
                 avis_dir = "🔴 NO-GO"
 
             # Synthèse globale
-            tous_avis = [avis_sol, avis_rafales, avis_500, avis_dir]
+            tous_avis = [avis_sol, avis_rafales, avis_alt, avis_dir]
             if "🔴 NO-GO" in tous_avis:
                 decision = "🔴 NO-GO"
             elif "🟠 Orange" in tous_avis:
@@ -99,8 +99,8 @@ try:
                 "Avis Sol": avis_sol,
                 "Écart Rafales": f"+{delta_rafales:.1f} km/h",
                 "Avis Rafales": avis_rafales,
-                "Vent Alt. (925hPa)": f"{v_500:.1f} km/h",
-                "Avis Alt.": avis_500,
+                "Vent 180m": f"{v_alt:.1f} km/h",
+                "Avis 180m": avis_alt,
                 "Dir. Sol": f"{dir_actuelle:.0f}° (Δ {max_diff:.0f}°)",
                 "Avis Dir.": avis_dir,
                 "Décision Globale": decision
