@@ -30,11 +30,12 @@ if nom_ville.strip():
     except Exception:
         st.error("Erreur lors de la recherche de la ville. Position par défaut retenue.")
 
-# Interrogation API Open-Meteo
+# Interrogation API Open-Meteo (hourly + daily pour soleil)
 url = (
     f"https://api.open-meteo.com/v1/forecast?"
     f"latitude={lat}&longitude={lon}"
     f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,wind_direction_180m,precipitation"
+    f"&daily=sunrise,sunset"
     f"&wind_speed_unit=kmh"
     f"&timezone=Europe%2FParis"
 )
@@ -56,6 +57,12 @@ try:
     if "hourly" not in data:
         st.error(f"Erreur du service météo : {data.get('reason', 'Réponse invalide')}")
     else:
+        # Affichage des heures de lever et coucher du soleil
+        if "daily" in data and "sunrise" in data["daily"] and "sunset" in data["daily"]:
+            lever_soleil = pd.to_datetime(data["daily"]["sunrise"][0]).strftime("%H:%M")
+            coucher_soleil = pd.to_datetime(data["daily"]["sunset"][0]).strftime("%H:%M")
+            st.info(f"🌅 **Lever du soleil :** {lever_soleil}  |  🌇 **Coucher du soleil :** {coucher_soleil}")
+
         hourly = data["hourly"]
         df = pd.DataFrame(hourly)
         df["time"] = pd.to_datetime(df["time"])
