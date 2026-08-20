@@ -2,8 +2,9 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="Météo Vol - Decision Maker", layout="wide")
-st.title("🪂 Aide à la décision de vol")
+st.set_page_config(page_title="Météo Vol - Decision Maker", layout="wide", page_icon="🪂")
+
+st.title("🪂 Decision Maker — Paramoteur & Vol Libre")
 
 # Sélection de la position GPS
 with st.expander("📍 Coordonnées GPS du terrain", expanded=False):
@@ -24,18 +25,26 @@ url = (
 
 headers = {"User-Agent": "MeteoVolApp/1.0"}
 
+def deg_vers_rose(deg):
+    """Convertit l'orientation en rose des vents avec flèche d'écoulement du vent."""
+    secteurs = [
+        "N ⬇️", "NE ↙️", "E ⬅️", "SE ↖️",
+        "S ⬆️", "SW ↗️", "W ➡️", "NW ↘️"
+    ]
+    idx = int((deg + 22.5) / 45) % 8
+    return secteurs[idx]
+
 try:
     res = requests.get(url, headers=headers)
     data = res.json()
     
     if "hourly" not in data:
-        st.error(f"Erreur transmise par le service météo : {data.get('reason', 'Réponse invalide')}")
+        st.error(f"Erreur du service météo : {data.get('reason', 'Réponse invalide')}")
     else:
         hourly = data["hourly"]
         df = pd.DataFrame(hourly)
         df["time"] = pd.to_datetime(df["time"])
         
-        # Filtrer à partir de l'heure actuelle
         now = pd.Timestamp.now()
         df_future = df[df["time"] >= now]
         if df_future.empty:
@@ -102,18 +111,21 @@ try:
             else:
                 decision = "🟢 Vol optimal"
 
+            rose = deg_vers_rose(dir_actuelle)
+
             return {
-                "Heure": row["time"].strftime("%H:%M (%d/%m)"),
-                "Vent sol": f"{v_sol:.1f} km/h",
+                "⏱️ Heure": row["time"].strftime("%H:%M (%d/%m)"),
+                "💨 Vent sol": f"{v_sol:.1f} km/h",
                 "Sol": avis_sol,
-                "Rafales": f"+{delta_rafales:.1f} km/h",
+                "🌪️ Rafales": f"+{delta_rafales:.1f} km/h",
                 "Delta": avis_rafales,
-                "Vent 180m": f"{v_alt:.1f} km/h",
+                "🪂 Vent 180m": f"{v_alt:.1f} km/h",
                 "Alt.": avis_alt,
-                "Dir.": f"{dir_actuelle:.0f}° (Δ{max_diff:.0f}°)",
-                "Pluie": f"{pluie:.1f} mm/h",
+                "🧭 Direction": f"{rose} ({dir_actuelle:.0f}°)",
+                "Dir. Status": avis_dir,
+                "🌧️ Pluie": f"{pluie:.1f} mm/h",
                 "Pluie Status": avis_pluie,
-                "Décision": decision
+                "🚦 Décision": decision
             }
 
         donnees_analysees = [analyser_creneau(row, df_future, i) for i, row in df_future.iterrows()]
@@ -121,17 +133,18 @@ try:
 
         # Carte de synthèse au sommet
         prochain = df_resultats.iloc[0]
-        statut_prochain = prochain["Décision"]
-        heure_prochaine = prochain["Heure"]
+        statut_prochain = prochain["🚦 Décision"]
+        heure_prochaine = prochain["⏱️ Heure"]
+        dir_prochaine = prochain["🧭 Direction"]
 
         if "🟢" in statut_prochain:
-            st.success(f"### Prochain créneau ({heure_prochaine}) : {statut_prochain}\nConditions favorables au vol.")
+            st.success(f"### 🟢 Prochain créneau ({heure_prochaine}) : Vol optimal\n**Vent du secteur :** {dir_prochaine}")
         elif "🟠" in statut_prochain:
-            st.warning(f"### Prochain créneau ({heure_prochaine}) : {statut_prochain}\nVigilance recommandée.")
+            st.warning(f"### 🟠 Prochain créneau ({heure_prochaine}) : Prudence\n**Vent du secteur :** {dir_prochaine}")
         else:
-            st.error(f"### Prochain créneau ({heure_prochaine}) : {statut_prochain}\nCréneau non praticable.")
+            st.error(f"### 🔴 Prochain créneau ({heure_prochaine}) : NO-GO\n**Vent du secteur :** {dir_prochaine}")
 
-        # Application du style de couleur sur les cases du tableau
+        # Stylisation dynamique
         def colorier_cellule(val):
             val_str = str(val)
             if "🟢" in val_str or "Vol optimal" in val_str or "Sec" in val_str:
@@ -144,7 +157,7 @@ try:
 
         styled_df = df_resultats.style.map(colorier_cellule)
 
-        st.subheader("Prévisions détaillées")
+        st.subheader("📊 Prévisions détaillées heure par heure")
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
 except Exception as e:
