@@ -6,13 +6,29 @@ st.set_page_config(page_title="Météo Vol - Decision Maker", layout="wide", pag
 
 st.title("🪂 Decision Maker — Paramoteur & Vol Libre")
 
-# Sélection de la position GPS
-with st.expander("📍 Coordonnées GPS du terrain", expanded=False):
-    col1, col2 = st.columns(2)
-    with col1:
-        lat = st.number_input("Latitude", value=48.0614, format="%.4f")
-    with col2:
-        lon = st.number_input("Longitude", value=7.4147, format="%.4f")
+# Recherche de la ville / spot
+nom_ville = st.text_input("📍 Rechercher une ville ou un spot de vol :", value="Andolsheim")
+
+# Géocodage via Open-Meteo
+lat, lon, nom_emplacement = 48.0614, 7.4147, "Andolsheim (Grand Est, France)"
+
+if nom_ville.strip():
+    try:
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={nom_ville}&count=1&language=fr&format=json"
+        geo_res = requests.get(geo_url).json()
+        
+        if "results" in geo_res and len(geo_res["results"]) > 0:
+            spot = geo_res["results"][0]
+            lat = spot["latitude"]
+            lon = spot["longitude"]
+            region = spot.get("admin1", "")
+            pays = spot.get("country", "")
+            nom_emplacement = f"{spot['name']} ({region}, {pays})"
+            st.success(f"🎯 Localisation : **{nom_emplacement}** — Lat: `{lat:.4f}`, Lon: `{lon:.4f}`")
+        else:
+            st.warning(f"Aucune localité trouvée pour « {nom_ville} ». Position par défaut retenue.")
+    except Exception:
+        st.error("Erreur lors de la recherche de la ville. Position par défaut retenue.")
 
 # Interrogation API Open-Meteo
 url = (
@@ -26,7 +42,6 @@ url = (
 headers = {"User-Agent": "MeteoVolApp/1.0"}
 
 def deg_vers_rose(deg):
-    """Convertit l'orientation en rose des vents avec flèche d'écoulement du vent."""
     secteurs = [
         "N ⬇️", "NE ↙️", "E ⬅️", "SE ↖️",
         "S ⬆️", "SW ↗️", "W ➡️", "NW ↘️"
