@@ -12,11 +12,11 @@ with col1:
 with col2:
     lon = st.number_input("Longitude", value=7.4147, format="%.4f")
 
-# Interrogation de l'API Open-Meteo avec paramétrage sécurisé
+# Interrogation de l'API Open-Meteo
 url = (
     f"https://api.open-meteo.com/v1/forecast?"
     f"latitude={lat}&longitude={lon}"
-    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_950hpa,wind_direction_950hpa"
+    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,windspeed_950hpa,winddirection_950hpa"
     f"&wind_speed_unit=kmh"
     f"&timezone=Europe%2FParis"
 )
@@ -62,7 +62,7 @@ try:
                 avis_rafales = "🔴 NO-GO"
 
             # 3. Vent à 950 hPa (~500 m)
-            v_500 = row.get("wind_speed_950hpa", 0)
+            v_500 = row.get("windspeed_950hpa", row.get("wind_speed_950hpa", 0))
             if v_500 < 25:
                 avis_500 = "🟢 Vert"
             elif v_500 <= 35:
