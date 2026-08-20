@@ -24,42 +24,6 @@ if nom_ville.strip():
     except:
         st.error("Erreur de géocodage.")
 
-# --- ESPACES AÉRIENS ET CONTRAINTES LOCALES ---
-with st.expander("🗺️ Espaces Aériens & Réglementation Locale (Andolsheim / Colmar / Haut-Rhin)", expanded=True):
-    st.markdown("""
-    ### 🛡️ Synthèse de l'espace aérien local :
-    
-    * **Espace au sol : Classe G (Espace non contrôlé)**
-      * Pas de contact radio obligatoire, mais anti-collision visuelle primordiale.
-      * Auto-information Colmar-Houssen : **125.850 MHz** (ou **123.500 MHz**).
-    
-    * **Aérodrome de Colmar-Houssen (LFGA) — ~6 km au Nord-Ouest :**
-      * **Trajectoires IFR :** Trajets d'approche aux instruments (avions d'affaires/école) entre Sélestat, la balise HO et l'axe 01/19.
-      * **Parachutisme :** Axe de largage sur LFGA + secteur au NO de Sainte-Croix-en-Plaine.
-    
-    * **Plafonds d'Altitude (TMA Strasbourg / Bâle-Mulhouse) :**
-      * Plancher des TMA au-dessus de la plaine généralement situé entre **2 500 ft (750 m)** et **3 500 ft (1 000 m) AMSL**.
-    
-    * **Massif des Vosges (PNR des Ballons des Vosges) — à l'Ouest :**
-      * Hauteur minimale de survol : **1 000 ft (300 m) sol** au-dessus des réserves naturelles (Arrêtés de Protection de Biotope).
-    
-    * **Frontière Franco-Allemande (Le Rhin) — ~12 km à l'Est :**
-      * Limite de la FIR française. Franchissement nécessitant le respect de la réglementation VFR/ULM allemande (Langen FIR).
-    
-    🔗 **Liens pour vérification avant vol :**
-    - [Carte OACI VFR - Géoportail](https://www.geoportail.gouv.fr/carte?c=7.4147,48.0614&z=12&l0=GEOGRAPHICALGRIDSSYSTEMS.MAPS.SCAN-OACI::GEOPORTAIL:OGC:WMTS(1)&permalink=no)
-    - [SIA - Service de l'Information Aéronautique (NOTAM / SUP AIP)](https://www.sia.aviation-civile.gouv.fr)
-    """)
-
-# --- CONTRAINTES MÉTÉO (EXPANDER) ---
-with st.expander("⚙️ Seuils de Décision Météo"):
-    st.markdown("""
-    - **Vent sol (10m) :** 🟢 < 12 km/h | 🟠 12 à 20 km/h | 🔴 > 20 km/h
-    - **Delta Rafales :** 🟢 < 5 km/h | 🟠 5 à 10 km/h | 🔴 > 10 km/h
-    - **Vent 180m :** 🟢 < 25 km/h | 🟠 25 à 35 km/h | 🔴 > 35 km/h
-    - **Pluie :** 🟢 Sec (0 mm) | 🟠 < 0.5 mm/h | 🔴 > 0.5 mm/h
-    """)
-
 # --- CALCUL MÉTÉO ---
 url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
        f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,wind_direction_180m,precipitation"
@@ -140,7 +104,7 @@ try:
             prochain = df_resultats.iloc[0]
             st.warning(f"### ⚠️ Prochain créneau : {prochain['🚦 Décision']}\n**Vent du secteur :** {prochain['🧭 Direction']}")
 
-        # Style
+        # Style du tableau
         def colorier_cellule(val):
             val_str = str(val)
             if "🟢" in val_str or "Vol optimal" in val_str or "Sec" in val_str:
@@ -153,6 +117,32 @@ try:
 
         st.subheader("📊 Prévisions détaillées heure par heure")
         st.dataframe(df_resultats.style.map(colorier_cellule), use_container_width=True, hide_index=True)
+
+        # --- CONDENSÉ ESPACES AÉRIENS (SOUS LE TABLEAU) ---
+        st.markdown("---")
+        st.subheader("🗺️ Repères Espace Aérien & Sécurité (Colmar / Andolsheim)")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown("""
+            **🟢 Classe d'espace & Plafonds**
+            * **Sol** : Classe G (Espace non contrôlé).
+            * **Plafond VFR Plaine** : TMA Bâle/Strasbourg à **2500 ft / 3500 ft AMSL** (~750m - 1000m).
+            """)
+        with col2:
+            st.markdown("""
+            **✈️ Aérodrome Colmar LFGA (~6km NO)**
+            * **Vigilance** : Approches IFR + largages parachutistes.
+            * **Fréquences** : Auto-info `125.850 MHz` | Vol libre `123.500 MHz`.
+            """)
+        with col3:
+            st.markdown("""
+            **🌲 Reliefs & Frontière**
+            * **Vosges (PNR)** : Min. **1000 ft (300m) sol** sur zones protégées.
+            * **Le Rhin (~12km E)** : Limite FIR France / Allemagne.
+            """)
+
+        st.caption("🔗 Liens utiles : [Carte OACI VFR Géoportail](https://www.geoportail.gouv.fr/carte?c=7.4147,48.0614&z=12&l0=GEOGRAPHICALGRIDSSYSTEMS.MAPS.SCAN-OACI::GEOPORTAIL:OGC:WMTS(1)&permalink=no) | [NOTAM SIA Aviation Civile](https://www.sia.aviation-civile.gouv.fr)")
 
 except Exception as e:
     st.error(f"Erreur de chargement météo : {e}")
