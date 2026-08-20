@@ -86,8 +86,6 @@ try:
         df_future = df_future.head(12).reset_index(drop=True)
 
         def analyser_creneau(row, df_context, idx):
-            heure_str = row["time"].strftime("%Hh")
-
             # 1. Vent sol
             v_sol = row.get("wind_speed_10m", 0)
             avis_sol = "🟢" if v_sol < 12 else ("🟠" if v_sol <= 20 else "🔴")
@@ -115,22 +113,22 @@ try:
             # Décision
             tous_avis = [avis_sol, avis_rafales, avis_alt, avis_dir, avis_pluie]
             if "🔴" in tous_avis:
-                decision_status = "🔴 NO-GO"
+                decision = "🔴 NO-GO"
             elif "🟠" in tous_avis:
-                decision_status = "🟠 Prudence"
+                decision = "🟠 Prudence"
             else:
-                decision_status = "🟢 Vol"
+                decision = "🟢 Vol"
 
             rose = deg_vers_rose(dir_actuelle)
 
             return {
-                "Heure": heure_str,
+                "Heure": row["time"].strftime("%Hh"),
                 "Sol": f"{v_sol:.0f}k {avis_sol}",
                 "Raf.": f"+{delta:.0f} {avis_rafales}",
                 "180m": f"{v_alt:.0f}k {avis_alt}",
                 "Dir.": f"{rose.split()[0]} {avis_dir}",
                 "Pluie": f"{pluie:.1f} {avis_pluie}",
-                "Avis": f"{heure_str} - {decision_status}"
+                "Avis": decision
             }
 
         donnees = [analyser_creneau(row, df_future, i) for i, row in df_future.iterrows()]
@@ -139,7 +137,7 @@ try:
         # Synthèse
         p = df_res.iloc[0]
         statut = p["Avis"]
-        st.markdown(f"**Prochain créneau : {statut}**")
+        st.markdown(f"**Prochain créneau ({p['Heure']}) : {statut}**")
 
         # Coloration des cellules
         def colorier(val):
