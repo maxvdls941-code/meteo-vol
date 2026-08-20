@@ -6,128 +6,100 @@ st.set_page_config(page_title="Météo Vol - Decision Maker", layout="wide", pag
 
 st.title("🪂 Decision Maker — Paramoteur & Vol Libre")
 
-# Recherche de la ville / spot
+# --- RECHERCHE DE SPOT ---
 nom_ville = st.text_input("📍 Rechercher une ville ou un spot de vol :", value="Andolsheim")
-
-# Géocodage via Open-Meteo
 lat, lon, nom_emplacement = 48.0614, 7.4147, "Andolsheim (Grand Est, France)"
 
 if nom_ville.strip():
     try:
         geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={nom_ville}&count=1&language=fr&format=json"
         geo_res = requests.get(geo_url).json()
-        
         if "results" in geo_res and len(geo_res["results"]) > 0:
             spot = geo_res["results"][0]
-            lat = spot["latitude"]
-            lon = spot["longitude"]
-            region = spot.get("admin1", "")
-            pays = spot.get("country", "")
-            nom_emplacement = f"{spot['name']} ({region}, {pays})"
+            lat, lon = spot["latitude"], spot["longitude"]
+            nom_emplacement = f"{spot['name']} ({spot.get('admin1', '')}, {spot.get('country', '')})"
             st.success(f"🎯 Localisation : **{nom_emplacement}** — Lat : `{lat:.4f}`, Lon : `{lon:.4f}`")
         else:
             st.warning(f"Aucune localité trouvée pour « {nom_ville} ». Position par défaut retenue.")
-    except Exception:
-        st.error("Erreur lors de la recherche de la ville. Position par défaut retenue.")
+    except:
+        st.error("Erreur de géocodage.")
 
-# Interrogation API Open-Meteo
-url = (
-    f"https://api.open-meteo.com/v1/forecast?"
-    f"latitude={lat}&longitude={lon}"
-    f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,wind_direction_180m,precipitation"
-    f"&daily=sunrise,sunset"
-    f"&wind_speed_unit=kmh"
-    f"&timezone=Europe%2FParis"
-)
+# --- ESPACES AÉRIENS ET CONTRAINTES LOCALES ---
+with st.expander("🗺️ Espaces Aériens & Réglementation Locale (Andolsheim / Colmar / Haut-Rhin)", expanded=True):
+    st.markdown("""
+    ### 🛡️ Synthèse de l'espace aérien local :
+    
+    * **Espace au sol : Classe G (Espace non contrôlé)**
+      * Pas de contact radio obligatoire, mais anti-collision visuelle primordiale.
+      * Auto-information Colmar-Houssen : **125.850 MHz** (ou **123.500 MHz**).
+    
+    * **Aérodrome de Colmar-Houssen (LFGA) — ~6 km au Nord-Ouest :**
+      * **Trajectoires IFR :** Trajets d'approche aux instruments (avions d'affaires/école) entre Sélestat, la balise HO et l'axe 01/19.
+      * **Parachutisme :** Axe de largage sur LFGA + secteur au NO de Sainte-Croix-en-Plaine.
+    
+    * **Plafonds d'Altitude (TMA Strasbourg / Bâle-Mulhouse) :**
+      * Plancher des TMA au-dessus de la plaine généralement situé entre **2 500 ft (750 m)** et **3 500 ft (1 000 m) AMSL**.
+    
+    * **Massif des Vosges (PNR des Ballons des Vosges) — à l'Ouest :**
+      * Hauteur minimale de survol : **1 000 ft (300 m) sol** au-dessus des réserves naturelles (Arrêtés de Protection de Biotope).
+    
+    * **Frontière Franco-Allemande (Le Rhin) — ~12 km à l'Est :**
+      * Limite de la FIR française. Franchissement nécessitant le respect de la réglementation VFR/ULM allemande (Langen FIR).
+    
+    🔗 **Liens pour vérification avant vol :**
+    - [Carte OACI VFR - Géoportail](https://www.geoportail.gouv.fr/carte?c=7.4147,48.0614&z=12&l0=GEOGRAPHICALGRIDSSYSTEMS.MAPS.SCAN-OACI::GEOPORTAIL:OGC:WMTS(1)&permalink=no)
+    - [SIA - Service de l'Information Aéronautique (NOTAM / SUP AIP)](https://www.sia.aviation-civile.gouv.fr)
+    """)
+
+# --- CONTRAINTES MÉTÉO (EXPANDER) ---
+with st.expander("⚙️ Seuils de Décision Météo"):
+    st.markdown("""
+    - **Vent sol (10m) :** 🟢 < 12 km/h | 🟠 12 à 20 km/h | 🔴 > 20 km/h
+    - **Delta Rafales :** 🟢 < 5 km/h | 🟠 5 à 10 km/h | 🔴 > 10 km/h
+    - **Vent 180m :** 🟢 < 25 km/h | 🟠 25 à 35 km/h | 🔴 > 35 km/h
+    - **Pluie :** 🟢 Sec (0 mm) | 🟠 < 0.5 mm/h | 🔴 > 0.5 mm/h
+    """)
+
+# --- CALCUL MÉTÉO ---
+url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+       f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,wind_direction_180m,precipitation"
+       f"&daily=sunrise,sunset&wind_speed_unit=kmh&timezone=Europe%2FParis")
 
 headers = {"User-Agent": "MeteoVolApp/1.0"}
 
 def deg_vers_rose(deg):
-    secteurs = [
-        "N ⬇️", "NE ↙️", "E ⬅️", "SE ↖️",
-        "S ⬆️", "SW ↗️", "W ➡️", "NW ↘️"
-    ]
-    idx = int((deg + 22.5) / 45) % 8
-    return secteurs[idx]
+    secteurs = ["N ⬇️", "NE ↙️", "E ⬅️", "SE ↖️", "S ⬆️", "SW ↗️", "W ➡️", "NW ↘️"]
+    return secteurs[int((deg + 22.5) / 45) % 8]
 
 try:
-    res = requests.get(url, headers=headers)
-    data = res.json()
+    res = requests.get(url, headers=headers).json()
     
-    if "hourly" not in data:
-        st.error(f"Erreur du service météo : {data.get('reason', 'Réponse invalide')}")
-    else:
-        # Affichage du soleil
-        if "daily" in data and "sunrise" in data["daily"] and "sunset" in data["daily"]:
-            lever_soleil = pd.to_datetime(data["daily"]["sunrise"][0]).strftime("%H:%M")
-            coucher_soleil = pd.to_datetime(data["daily"]["sunset"][0]).strftime("%H:%M")
-            st.info(f"🌅 **Lever du soleil :** {lever_soleil}  |  🌇 **Coucher du soleil :** {coucher_soleil}")
+    if "hourly" in res:
+        if "daily" in res and "sunrise" in res["daily"]:
+            sr = pd.to_datetime(res["daily"]["sunrise"][0]).strftime("%H:%M")
+            ss = pd.to_datetime(res["daily"]["sunset"][0]).strftime("%H:%M")
+            st.info(f"🌅 **Lever :** {sr}  |  🌇 **Coucher :** {ss}")
 
-        hourly = data["hourly"]
-        df = pd.DataFrame(hourly)
+        df = pd.DataFrame(res["hourly"])
         df["time"] = pd.to_datetime(df["time"])
-        
         now = pd.Timestamp.now()
-        df_future = df[df["time"] >= now]
-        if df_future.empty:
-            df_future = df
-        df_future = df_future.head(12).reset_index(drop=True)
+        df_future = df[df["time"] >= now].head(12).reset_index(drop=True)
 
-        def analyser_creneau(row, df_context, idx):
+        def analyser(row, df_context, idx):
             heure_str = row["time"].strftime("%H:%M")
-
-            # 1. Vent moyen sol (10 m)
             v_sol = row.get("wind_speed_10m", 0)
-            if v_sol < 12:
-                avis_sol = "🟢 Vert"
-            elif v_sol <= 20:
-                avis_sol = "🟠 Orange"
-            else:
-                avis_sol = "🔴 NO-GO"
-
-            # 2. Écart Rafales
             rafales = row.get("wind_gusts_10m", v_sol)
             delta_rafales = rafales - v_sol
-            if delta_rafales < 5:
-                avis_rafales = "🟢 Vert"
-            elif delta_rafales <= 10:
-                avis_rafales = "🟠 Orange"
-            else:
-                avis_rafales = "🔴 NO-GO"
-
-            # 3. Vent en altitude (180 m)
             v_alt = row.get("wind_speed_180m", 0)
-            if v_alt < 25:
-                avis_alt = "🟢 Vert"
-            elif v_alt <= 35:
-                avis_alt = "🟠 Orange"
-            else:
-                avis_alt = "🔴 NO-GO"
-
-            # 4. Évolution direction
-            dir_actuelle = row.get("wind_direction_10m", 0)
-            prochaines_dirs = df_context.loc[idx:idx+2, "wind_direction_10m"] if "wind_direction_10m" in df_context.columns else []
-            diffs = [min(abs(d - dir_actuelle), 360 - abs(d - dir_actuelle)) for d in prochaines_dirs]
-            max_diff = max(diffs) if diffs else 0
-
-            if max_diff <= 20:
-                avis_dir = "🟢 Vert"
-            elif max_diff <= 90:
-                avis_dir = "🟠 Orange"
-            else:
-                avis_dir = "🔴 NO-GO"
-
-            # 5. Précipitations
             pluie = row.get("precipitation", 0)
-            if pluie == 0:
-                avis_pluie = "🟢 Sec"
-            elif pluie < 0.5:
-                avis_pluie = "🟠 Risque"
-            else:
-                avis_pluie = "🔴 NO-GO"
+            dir_actuelle = row.get("wind_direction_10m", 0)
 
-            # Synthèse globale
-            tous_avis = [avis_sol, avis_rafales, avis_alt, avis_dir, avis_pluie]
+            avis_sol = "🟢 Vert" if v_sol < 12 else ("🟠 Orange" if v_sol <= 20 else "🔴 NO-GO")
+            avis_raf = "🟢 Vert" if delta_rafales < 5 else ("🟠 Orange" if delta_rafales <= 10 else "🔴 NO-GO")
+            avis_alt = "🟢 Vert" if v_alt < 25 else ("🟠 Orange" if v_alt <= 35 else "🔴 NO-GO")
+            avis_plu = "🟢 Sec" if pluie == 0 else ("🟠 Risque" if pluie < 0.5 else "🔴 NO-GO")
+
+            tous_avis = [avis_sol, avis_raf, avis_alt, avis_plu]
             if any("🔴" in a for a in tous_avis):
                 decision = "🔴 NO-GO"
             elif any("🟠" in a for a in tous_avis):
@@ -142,22 +114,20 @@ try:
                 "💨 Vent sol": f"{v_sol:.1f} km/h",
                 "Sol": avis_sol,
                 "🌪️ Rafales": f"+{delta_rafales:.1f} km/h",
-                "Delta": avis_rafales,
+                "Delta": avis_raf,
                 "🪂 Vent 180m": f"{v_alt:.1f} km/h",
                 "Alt.": avis_alt,
                 "🧭 Direction": f"{rose} ({dir_actuelle:.0f}°)",
-                "Dir. Status": avis_dir,
                 "🌧️ Pluie": f"{pluie:.1f} mm/h",
-                "Pluie Status": avis_pluie,
+                "Pluie Status": avis_plu,
                 "🚦 Décision": f"{heure_str} — {decision}"
             }
 
-        donnees_analysees = [analyser_creneau(row, df_future, i) for i, row in df_future.iterrows()]
-        df_resultats = pd.DataFrame(donnees_analysees)
+        donnees = [analyser(row, df_future, i) for i, row in df_future.iterrows()]
+        df_resultats = pd.DataFrame(donnees)
 
-        # Recherche ciblée des créneaux "Vol optimal"
+        # Synthèse Vol Optimal
         df_verts = df_resultats[df_resultats["🚦 Décision"].str.contains("Vol optimal", na=False)]
-
         if not df_verts.empty:
             prochain_vert = df_verts.iloc[0]
             heures_vertes = " | ".join(df_verts["⏱️ Heure"].apply(lambda x: x.split()[0]).tolist())
@@ -168,12 +138,9 @@ try:
             )
         else:
             prochain = df_resultats.iloc[0]
-            if "🟠" in prochain["🚦 Décision"]:
-                st.warning(f"### 🟠 Prochain créneau : {prochain['🚦 Décision']}\n**Vent du secteur :** {prochain['🧭 Direction']}\n\n⚠️ Aucun créneau vert idéal sur les 12h à venir.")
-            else:
-                st.error(f"### 🔴 Prochain créneau : {prochain['🚦 Décision']}\n**Vent du secteur :** {prochain['🧭 Direction']}\n\n⛔ Aucun créneau vert idéal sur les 12h à venir.")
+            st.warning(f"### ⚠️ Prochain créneau : {prochain['🚦 Décision']}\n**Vent du secteur :** {prochain['🧭 Direction']}")
 
-        # Stylisation dynamique
+        # Style
         def colorier_cellule(val):
             val_str = str(val)
             if "🟢" in val_str or "Vol optimal" in val_str or "Sec" in val_str:
@@ -184,10 +151,8 @@ try:
                 return "background-color: #f8d7da; color: #721c24; font-weight: bold;"
             return ""
 
-        styled_df = df_resultats.style.map(colorier_cellule)
-
         st.subheader("📊 Prévisions détaillées heure par heure")
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        st.dataframe(df_resultats.style.map(colorier_cellule), use_container_width=True, hide_index=True)
 
 except Exception as e:
-    st.error(f"Impossible de récupérer les données météo : {e}")
+    st.error(f"Erreur de chargement météo : {e}")
