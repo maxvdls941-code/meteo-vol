@@ -3,16 +3,17 @@ import requests
 import pandas as pd
 
 st.set_page_config(page_title="Météo Vol - Decision Maker", layout="wide")
-st.title("Aide à la décision de vol (Paramoteur / Parapente)")
+st.title("🪂 Aide à la décision de vol")
 
 # Sélection de la position GPS
-col1, col2 = st.columns(2)
-with col1:
-    lat = st.number_input("Latitude", value=48.0614, format="%.4f")
-with col2:
-    lon = st.number_input("Longitude", value=7.4147, format="%.4f")
+with st.expander("📍 Coordonnées GPS du terrain", expanded=False):
+    col1, col2 = st.columns(2)
+    with col1:
+        lat = st.number_input("Latitude", value=48.0614, format="%.4f")
+    with col2:
+        lon = st.number_input("Longitude", value=7.4147, format="%.4f")
 
-# Interrogation de l'API Open-Meteo (Vent sol, rafales, 180m, direction et pluie)
+# Interrogation API Open-Meteo
 url = (
     f"https://api.open-meteo.com/v1/forecast?"
     f"latitude={lat}&longitude={lon}"
@@ -51,7 +52,7 @@ try:
             else:
                 avis_sol = "🔴 NO-GO"
 
-            # 2. Écart Rafales (Delta = Rafales - Vent moyen)
+            # 2. Écart Rafales
             rafales = row.get("wind_gusts_10m", v_sol)
             delta_rafales = rafales - v_sol
             if delta_rafales < 5:
@@ -70,10 +71,9 @@ try:
             else:
                 avis_alt = "🔴 NO-GO"
 
-            # 4. Évolution de la direction
+            # 4. Évolution direction
             dir_actuelle = row.get("wind_direction_10m", 0)
             prochaines_dirs = df_context.loc[idx:idx+2, "wind_direction_10m"] if "wind_direction_10m" in df_context.columns else []
-            
             diffs = [min(abs(d - dir_actuelle), 360 - abs(d - dir_actuelle)) for d in prochaines_dirs]
             max_diff = max(diffs) if diffs else 0
 
@@ -84,7 +84,7 @@ try:
             else:
                 avis_dir = "🔴 NO-GO"
 
-            # 5. Précipitations (Pluie)
+            # 5. Précipitations
             pluie = row.get("precipitation", 0)
             if pluie == 0:
                 avis_pluie = "🟢 Sec"
@@ -105,22 +105,47 @@ try:
             return {
                 "Heure": row["time"].strftime("%H:%M (%d/%m)"),
                 "Vent sol": f"{v_sol:.1f} km/h",
-                "Avis Sol": avis_sol,
-                "Écart Rafales": f"+{delta_rafales:.1f} km/h",
-                "Avis Rafales": avis_rafales,
+                "Sol": avis_sol,
+                "Rafales": f"+{delta_rafales:.1f} km/h",
+                "Delta": avis_rafales,
                 "Vent 180m": f"{v_alt:.1f} km/h",
-                "Avis 180m": avis_alt,
-                "Dir. Sol": f"{dir_actuelle:.0f}° (Δ {max_diff:.0f}°)",
+                "Alt.": avis_alt,
+                "Dir.": f"{dir_actuelle:.0f}° (Δ{max_diff:.0f}°)",
                 "Pluie": f"{pluie:.1f} mm/h",
-                "Avis Pluie": avis_pluie,
-                "Décision Globale": decision
+                "Pluie Status": avis_pluie,
+                "Décision": decision
             }
 
         donnees_analysees = [analyser_creneau(row, df_future, i) for i, row in df_future.iterrows()]
         df_resultats = pd.DataFrame(donnees_analysees)
 
-        st.subheader("Analyse heure par heure")
-        st.dataframe(df_resultats, use_container_width=True)
+        # Carte de synthèse au sommet
+        prochain = df_resultats.iloc[0]
+        statut_prochain = prochain["Décision"]
+        heure_prochaine = prochain["Heure"]
+
+        if "🟢" in statut_prochain:
+            st.success(f"### Prochain créneau ({heure_prochaine}) : {statut_prochain}\nConditions favorables au vol.")
+        elif "🟠" in statut_prochain:
+            st.warning(f"### Prochain créneau ({heure_prochaine}) : {statut_prochain}\nVigilance recommandée.")
+        else:
+            st.error(f"### Prochain créneau ({heure_prochaine}) : {statut_prochain}\nCréneau non praticable.")
+
+        # Application du style de couleur sur les cases du tableau
+        def colorier_cellule(val):
+            val_str = str(val)
+            if "🟢" in val_str or "Vol optimal" in val_str or "Sec" in val_str:
+                return "background-color: #d4edda; color: #155724; font-weight: bold;"
+            elif "🟠" in val_str or "Prudence" in val_str or "Risque" in val_str:
+                return "background-color: #fff3cd; color: #856404; font-weight: bold;"
+            elif "🔴" in val_str or "NO-GO" in val_str:
+                return "background-color: #f8d7da; color: #721c24; font-weight: bold;"
+            return ""
+
+        styled_df = df_resultats.style.map(colorier_cellule)
+
+        st.subheader("Prévisions détaillées")
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
 except Exception as e:
     st.error(f"Impossible de récupérer les données météo : {e}")
