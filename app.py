@@ -118,31 +118,23 @@ try:
         st.subheader("📊 Prévisions détaillées heure par heure")
         st.dataframe(df_resultats.style.map(colorier_cellule), use_container_width=True, hide_index=True)
 
-        # --- CONDENSÉ ESPACES AÉRIENS (SOUS LE TABLEAU) ---
+        # --- LIEN DYNAMIQUE CARTE OACI ET ESPACES AÉRIENS ---
         st.markdown("---")
-        st.subheader("🗺️ Repères Espace Aérien & Sécurité (Colmar / Andolsheim)")
+        st.subheader(f"🗺️ Espace Aérien & Vérification Aéronautique ({nom_emplacement})")
         
-        col1, col2, col3 = st.columns(3)
+        # Url géoportail centrée automatiquement sur la ville recherchée
+        url_geoportail_dyn = f"https://www.geoportail.gouv.fr/carte?c={lon},{lat}&z=12&l0=GEOGRAPHICALGRIDSSYSTEMS.MAPS.SCAN-OACI::GEOPORTAIL:OGC:WMTS(1)&permalink=no"
+        
+        col1, col2 = st.columns([2, 1])
         with col1:
-            st.markdown("""
-            **🟢 Classe d'espace & Plafonds**
-            * **Sol** : Classe G (Espace non contrôlé).
-            * **Plafond VFR Plaine** : TMA Bâle/Strasbourg à **2500 ft / 3500 ft AMSL** (~750m - 1000m).
+            st.markdown(f"""
+            * **Carte OACI centrée sur la zone** : Vérifie la présence de CTR, TMA, zones P/D/R ou Parachutisme autour de **{nom_emplacement}**.
+            * **Règles VFR générales** : Maintien de l'anti-collision visuelle, écoute radio conseillée en proximité de CTR/Aérodromes.
+            * **Plafond théorique** : Ne pas pénétrer dans les TMA contrôlées sans clairance radio.
             """)
         with col2:
-            st.markdown("""
-            **✈️ Aérodrome Colmar LFGA (~6km NO)**
-            * **Vigilance** : Approches IFR + largages parachutistes.
-            * **Fréquences** : Auto-info `125.850 MHz` | Vol libre `123.500 MHz`.
-            """)
-        with col3:
-            st.markdown("""
-            **🌲 Reliefs & Frontière**
-            * **Vosges (PNR)** : Min. **1000 ft (300m) sol** sur zones protégées.
-            * **Le Rhin (~12km E)** : Limite FIR France / Allemagne.
-            """)
-
-        st.caption("🔗 Liens utiles : [Carte OACI VFR Géoportail](https://www.geoportail.gouv.fr/carte?c=7.4147,48.0614&z=12&l0=GEOGRAPHICALGRIDSSYSTEMS.MAPS.SCAN-OACI::GEOPORTAIL:OGC:WMTS(1)&permalink=no) | [NOTAM SIA Aviation Civile](https://www.sia.aviation-civile.gouv.fr)")
+            st.link_button(f"🗺️ Ouvrir la carte OACI de {spot['name'] if 'spot' in locals() else 'la zone'}", url_geoportail_dyn, use_container_width=True)
+            st.link_button("📄 Consulter les NOTAM (SIA)", "https://www.sia.aviation-civile.gouv.fr", use_container_width=True)
 
 except Exception as e:
     st.error(f"Erreur de chargement météo : {e}")
