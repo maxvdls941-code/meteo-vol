@@ -2,15 +2,30 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="Météo Vol - Decision Maker", layout="wide", page_icon="🪂")
+st.set_page_config(page_title="Météo Vol", layout="wide", page_icon="🪂")
 
-st.title("🪂 Decision Maker — Paramoteur & Vol Libre")
+# CSS d'optimisation pour écran de smartphone
+st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        padding-left: 0.3rem !important;
+        padding-right: 0.3rem !important;
+    }
+    h1 {
+        font-size: 1.5rem !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("🪂 Decision Maker Vol")
 
 # Recherche de la ville / spot
-nom_ville = st.text_input("📍 Rechercher une ville ou un spot de vol :", value="Andolsheim")
+nom_ville = st.text_input("📍 Ville ou spot :", value="Andolsheim")
 
 # Géocodage via Open-Meteo
-lat, lon, nom_emplacement = 48.0614, 7.4147, "Andolsheim (Grand Est, France)"
+lat, lon, nom_emplacement = 48.0614, 7.4147, "Andolsheim"
 
 if nom_ville.strip():
     try:
@@ -23,14 +38,14 @@ if nom_ville.strip():
             lon = spot["longitude"]
             region = spot.get("admin1", "")
             pays = spot.get("country", "")
-            nom_emplacement = f"{spot['name']} ({region}, {pays})"
-            st.success(f"🎯 Localisation : **{nom_emplacement}** — Lat: `{lat:.4f}`, Lon: `{lon:.4f}`")
+            nom_emplacement = f"{spot['name']} ({region})"
+            st.caption(f"🎯 **{nom_emplacement}** (`{lat:.3f}`, `{lon:.3f}`)")
         else:
-            st.warning(f"Aucune localité trouvée pour « {nom_ville} ». Position par défaut retenue.")
+            st.warning("Ville non trouvée, position par défaut.")
     except Exception:
-        st.error("Erreur lors de la recherche de la ville. Position par défaut retenue.")
+        st.error("Erreur de recherche.")
 
-# Interrogation API Open-Meteo (hourly + daily pour soleil)
+# Interrogation API Open-Meteo
 url = (
     f"https://api.open-meteo.com/v1/forecast?"
     f"latitude={lat}&longitude={lon}"
@@ -43,10 +58,7 @@ url = (
 headers = {"User-Agent": "MeteoVolApp/1.0"}
 
 def deg_vers_rose(deg):
-    secteurs = [
-        "N ⬇️", "NE ↙️", "E ⬅️", "SE ↖️",
-        "S ⬆️", "SW ↗️", "W ➡️", "NW ↘️"
-    ]
+    secteurs = ["N ⬇️", "NE ↙️", "E ⬅️", "SE ↖️", "S ⬆️", "SW ↗️", "W ➡️", "NW ↘️"]
     idx = int((deg + 22.5) / 45) % 8
     return secteurs[idx]
 
@@ -55,13 +67,13 @@ try:
     data = res.json()
     
     if "hourly" not in data:
-        st.error(f"Erreur du service météo : {data.get('reason', 'Réponse invalide')}")
+        st.error("Données indisponibles.")
     else:
-        # Affichage des heures de lever et coucher du soleil
-        if "daily" in data and "sunrise" in data["daily"] and "sunset" in data["daily"]:
-            lever_soleil = pd.to_datetime(data["daily"]["sunrise"][0]).strftime("%H:%M")
-            coucher_soleil = pd.to_datetime(data["daily"]["sunset"][0]).strftime("%H:%M")
-            st.info(f"🌅 **Lever du soleil :** {lever_soleil}  |  🌇 **Coucher du soleil :** {coucher_soleil}")
+        # Soleils
+        if "daily" in data and "sunrise" in data["daily"]:
+            lever = pd.to_datetime(data["daily"]["sunrise"][0]).strftime("%H:%M")
+            coucher = pd.to_datetime(data["daily"]["sunset"][0]).strftime("%H:%M")
+            st.info(f"🌅 {lever}  |  🌇 {coucher}")
 
         hourly = data["hourly"]
         df = pd.DataFrame(hourly)
@@ -74,113 +86,79 @@ try:
         df_future = df_future.head(12).reset_index(drop=True)
 
         def analyser_creneau(row, df_context, idx):
-            # 1. Vent moyen sol (10 m)
+            heure_str = row["time"].strftime("%Hh")
+
+            # 1. Vent sol
             v_sol = row.get("wind_speed_10m", 0)
-            if v_sol < 12:
-                avis_sol = "🟢 Vert"
-            elif v_sol <= 20:
-                avis_sol = "🟠 Orange"
-            else:
-                avis_sol = "🔴 NO-GO"
+            avis_sol = "🟢" if v_sol < 12 else ("🟠" if v_sol <= 20 else "🔴")
 
-            # 2. Écart Rafales
+            # 2. Rafales
             rafales = row.get("wind_gusts_10m", v_sol)
-            delta_rafales = rafales - v_sol
-            if delta_rafales < 5:
-                avis_rafales = "🟢 Vert"
-            elif delta_rafales <= 10:
-                avis_rafales = "🟠 Orange"
-            else:
-                avis_rafales = "🔴 NO-GO"
+            delta = rafales - v_sol
+            avis_rafales = "🟢" if delta < 5 else ("🟠" if delta <= 10 else "🔴")
 
-            # 3. Vent en altitude (180 m)
+            # 3. Vent 180m
             v_alt = row.get("wind_speed_180m", 0)
-            if v_alt < 25:
-                avis_alt = "🟢 Vert"
-            elif v_alt <= 35:
-                avis_alt = "🟠 Orange"
-            else:
-                avis_alt = "🔴 NO-GO"
+            avis_alt = "🟢" if v_alt < 25 else ("🟠" if v_alt <= 35 else "🔴")
 
-            # 4. Évolution direction
+            # 4. Direction
             dir_actuelle = row.get("wind_direction_10m", 0)
             prochaines_dirs = df_context.loc[idx:idx+2, "wind_direction_10m"] if "wind_direction_10m" in df_context.columns else []
             diffs = [min(abs(d - dir_actuelle), 360 - abs(d - dir_actuelle)) for d in prochaines_dirs]
             max_diff = max(diffs) if diffs else 0
+            avis_dir = "🟢" if max_diff <= 20 else ("🟠" if max_diff <= 90 else "🔴")
 
-            if max_diff <= 20:
-                avis_dir = "🟢 Vert"
-            elif max_diff <= 90:
-                avis_dir = "🟠 Orange"
-            else:
-                avis_dir = "🔴 NO-GO"
-
-            # 5. Précipitations
+            # 5. Pluie
             pluie = row.get("precipitation", 0)
-            if pluie == 0:
-                avis_pluie = "🟢 Sec"
-            elif pluie < 0.5:
-                avis_pluie = "🟠 Risque"
-            else:
-                avis_pluie = "🔴 NO-GO"
+            avis_pluie = "🟢" if pluie == 0 else ("🟠" if pluie < 0.5 else "🔴")
 
-            # Synthèse globale
+            # Décision
             tous_avis = [avis_sol, avis_rafales, avis_alt, avis_dir, avis_pluie]
-            if any("🔴" in a for a in tous_avis):
-                decision = "🔴 NO-GO"
-            elif any("🟠" in a for a in tous_avis):
-                decision = "🟠 Prudence"
+            if "🔴" in tous_avis:
+                decision_status = "🔴 NO-GO"
+            elif "🟠" in tous_avis:
+                decision_status = "🟠 Prudence"
             else:
-                decision = "🟢 Vol optimal"
+                decision_status = "🟢 Vol"
 
             rose = deg_vers_rose(dir_actuelle)
 
             return {
-                "⏱️ Heure": row["time"].strftime("%H:%M (%d/%m)"),
-                "💨 Vent sol": f"{v_sol:.1f} km/h",
-                "Sol": avis_sol,
-                "🌪️ Rafales": f"+{delta_rafales:.1f} km/h",
-                "Delta": avis_rafales,
-                "🪂 Vent 180m": f"{v_alt:.1f} km/h",
-                "Alt.": avis_alt,
-                "🧭 Direction": f"{rose} ({dir_actuelle:.0f}°)",
-                "Dir. Status": avis_dir,
-                "🌧️ Pluie": f"{pluie:.1f} mm/h",
-                "Pluie Status": avis_pluie,
-                "🚦 Décision": decision
+                "Heure": heure_str,
+                "Sol": f"{v_sol:.0f}k {avis_sol}",
+                "Raf.": f"+{delta:.0f} {avis_rafales}",
+                "180m": f"{v_alt:.0f}k {avis_alt}",
+                "Dir.": f"{rose.split()[0]} {avis_dir}",
+                "Pluie": f"{pluie:.1f} {avis_pluie}",
+                "Avis": f"{heure_str} - {decision_status}"
             }
 
-        donnees_analysees = [analyser_creneau(row, df_future, i) for i, row in df_future.iterrows()]
-        df_resultats = pd.DataFrame(donnees_analysees)
+        donnees = [analyser_creneau(row, df_future, i) for i, row in df_future.iterrows()]
+        df_res = pd.DataFrame(donnees)
 
-        # Carte de synthèse au sommet
-        prochain = df_resultats.iloc[0]
-        statut_prochain = prochain["🚦 Décision"]
-        heure_prochaine = prochain["⏱️ Heure"]
-        dir_prochaine = prochain["🧭 Direction"]
+        # Synthèse
+        p = df_res.iloc[0]
+        statut = p["Avis"]
+        st.markdown(f"**Prochain créneau : {statut}**")
 
-        if "🟢" in statut_prochain:
-            st.success(f"### 🟢 Prochain créneau ({heure_prochaine}) : Vol optimal\n**Vent du secteur :** {dir_prochaine}")
-        elif "🟠" in statut_prochain:
-            st.warning(f"### 🟠 Prochain créneau ({heure_prochaine}) : Prudence\n**Vent du secteur :** {dir_prochaine}")
-        else:
-            st.error(f"### 🔴 Prochain créneau ({heure_prochaine}) : NO-GO\n**Vent du secteur :** {dir_prochaine}")
-
-        # Stylisation dynamique
-        def colorier_cellule(val):
-            val_str = str(val)
-            if "🟢" in val_str or "Vol optimal" in val_str or "Sec" in val_str:
+        # Coloration des cellules
+        def colorier(val):
+            v = str(val)
+            if "🟢" in v or "Vol" in v:
                 return "background-color: #d4edda; color: #155724; font-weight: bold;"
-            elif "🟠" in val_str or "Prudence" in val_str or "Risque" in val_str:
+            elif "🟠" in v or "Prudence" in v:
                 return "background-color: #fff3cd; color: #856404; font-weight: bold;"
-            elif "🔴" in val_str or "NO-GO" in val_str:
+            elif "🔴" in v or "NO-GO" in v:
                 return "background-color: #f8d7da; color: #721c24; font-weight: bold;"
             return ""
 
-        styled_df = df_resultats.style.map(colorier_cellule)
+        styled_df = df_res.style.map(colorier)
 
-        st.subheader("📊 Prévisions détaillées heure par heure")
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            hide_index=True
+        )
 
 except Exception as e:
-    st.error(f"Impossible de récupérer les données météo : {e}")
+    st.error(f"Erreur : {e}")
