@@ -8,7 +8,7 @@ st.title("🪂 Decision Maker — Paramoteur & Vol Libre")
 
 # --- RECHERCHE DE SPOT ---
 nom_ville = st.text_input("📍 Rechercher une ville ou un spot de vol :", value="Andolsheim")
-lat, lon, nom_emplacement = 48.0614, 7.4147, "Andolsheim (Grand Est, France)"
+lat, lon, nom_emplacement = 48.339278, 7.474208, "Epfig (Grand Est, France)"
 
 if nom_ville.strip():
     try:
