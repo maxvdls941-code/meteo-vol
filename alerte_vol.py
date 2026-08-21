@@ -7,9 +7,9 @@ TELEGRAM_TOKEN = "8998541789:AAFirSkQ969Y0Iyn2vTr4a7QlE24Jn78has"
 TELEGRAM_CHAT_ID = "8699172038"
 
 # Coordonnées spot (Andolsheim)
-LAT = 48.0614
-LON = 7.4147
-VILLE = "Andolsheim"
+LAT = 48.339278
+LON = 7.474208
+VILLE = "Epfig"
 
 def deg_vers_rose(deg):
     secteurs = ["N ⬇️", "NE ↙️", "E ⬅️", "SE ↖️", "S ⬆️", "SW ↗️", "W ➡️", "NW ↘️"]
