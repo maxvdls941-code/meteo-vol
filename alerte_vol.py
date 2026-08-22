@@ -6,11 +6,11 @@ from datetime import datetime
 TELEGRAM_TOKEN = "8998541789:AAFirSkQ969Y0Iyn2vTr4a7QlE24Jn78has"
 TELEGRAM_CHAT_ID = "8699172038"
 
-# Coordonnées spot (Andolsheim par défaut)
+# Coordonnées spot (Epfig par défaut)
 # Pour Epfig : LAT = 48.3582, LON = 7.4636
-LAT = 48.0614
-LON = 7.4147
-VILLE = "Andolsheim"
+LAT = 48.3582
+LON = 7.4636
+VILLE = "Epfig"
 
 def deg_vers_rose(deg):
     secteurs = ["N ⬇️", "NE ↙️", "E ⬅️", "SE ↖️", "S ⬆️", "SW ↗️", "W ➡️", "NW ↘️"]
