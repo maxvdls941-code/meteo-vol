@@ -7,7 +7,7 @@ from datetime import datetime
 st.set_page_config(page_title="Météo Vol Paramoteur", page_icon="🪂", layout="wide")
 
 st.title("🪂 Météo Vol Paramoteur")
-st.caption("Surveillance météo complète pour Andolsheim et Epfig")
+st.caption("Surveillance météo complète pour Aventure Mulhouse et Epfig")
 
 # Options en haut de page
 col_opt1, col_opt2 = st.columns([2, 1])
@@ -45,7 +45,7 @@ now_str = datetime.now().strftime("%H:%M:%S")
 st.info(f"🕒 **Dernière actualisation des données :** {now_str}")
 
 SPOTS = [
-    {"name": "Andolsheim", "lat": 48.0614, "lon": 7.4147},
+    {"name": "Aventure Mulhouse (Terciel)", "lat": 47.8180, "lon": 7.1200},
     {"name": "Epfig", "lat": 48.3582, "lon": 7.4636}
 ]
 
