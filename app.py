@@ -48,7 +48,7 @@ SPOTS = [
     {"name": "Epfig", "lat": 48.3582, "lon": 7.4636}
 ]
 
-# Création de 2 colonnes côte à côte pour éliminer le défilement vertical
+# 2 colonnes côte à côte
 cols = st.columns(2)
 
 for i, spot in enumerate(SPOTS):
@@ -103,7 +103,9 @@ for i, spot in enumerate(SPOTS):
 
             if tableau:
                 df_res = pd.DataFrame(tableau)
-                st.dataframe(df_res, hide_index=True, use_container_width=True)
+                # Hauteur dynamique pour afficher TOUTES les lignes jusqu'au bas
+                hauteur_dynamique = (len(df_res) + 1) * 35 + 10
+                st.dataframe(df_res, hide_index=True, use_container_width=True, height=hauteur_dynamique)
             else:
                 st.warning("Aucun créneau à afficher.")
         else:
