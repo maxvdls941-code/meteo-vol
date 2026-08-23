@@ -50,8 +50,11 @@ SPOTS = [
 def get_cardinal(deg):
     dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", 
             "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"]
+    # Flèches indiquant la direction vers laquelle va le vent
+    arrows = ["⬇️", "⬇️", "↙️", "↙️", "⬅️", "⬅️", "↖️", "↖️", 
+              "⬆️", "⬆️", "↗️", "↗️", "➡️", "➡️", "↘️", "↘️"]
     idx = int((deg + 11.25) // 22.5) % 16
-    return f"{dirs[idx]} ({int(deg)}°)"
+    return f"{arrows[idx]} {dirs[idx]} ({int(deg)}°)"
 
 def get_plage_horaire(heure_dt):
     h = heure_dt.hour
