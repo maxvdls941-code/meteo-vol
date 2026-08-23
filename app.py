@@ -1,21 +1,55 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 import pandas as pd
+from datetime import datetime
 
 st.set_page_config(page_title="Météo Vol Paramoteur", page_icon="🪂", layout="wide")
 
 st.title("🪂 Météo Vol Paramoteur")
 st.caption("Surveillance météo complète pour Andolsheim et Epfig")
 
-# Option pour afficher tout ou seulement les créneaux volables
-afficher_tout = st.checkbox("Afficher toutes les heures de la journée (même non volables)", value=True)
+# Options en haut de page
+col_opt1, col_opt2 = st.columns([2, 1])
+
+with col_opt1:
+    afficher_tout = st.checkbox("Afficher toutes les heures de la journée (même non volables)", value=True)
+
+with col_opt2:
+    auto_refresh_choice = st.selectbox(
+        "🔄 Auto-rafraîchissement",
+        ["30 minutes", "1 heure", "2 heures", "Désactivé"],
+        index=0
+    )
+
+# Gestion du minutage pour le rafraîchissement automatique
+refresh_ms_map = {
+    "30 minutes": 30 * 60 * 1000,
+    "1 heure": 60 * 60 * 1000,
+    "2 heures": 120 * 60 * 1000,
+    "Désactivé": None
+}
+
+refresh_ms = refresh_ms_map[auto_refresh_choice]
+if refresh_ms:
+    components.html(f"""
+        <script>
+            setTimeout(function(){{
+                window.location.reload();
+            }}, {refresh_ms});
+        </script>
+    """, height=0)
+
+# Affichage de l'heure de dernière mise à jour
+now_str = datetime.now().strftime("%H:%M:%S")
+st.info(f"🕒 **Dernière actualisation des données :** {now_str}")
 
 SPOTS = [
     {"name": "Andolsheim", "lat": 48.0614, "lon": 7.4147},
     {"name": "Epfig", "lat": 48.3582, "lon": 7.4636}
 ]
 
-if st.button("🔄 Rafraîchir la météo"):
+if st.button("🔄 Rafraîchir manuellement"):
     st.rerun()
 
 for spot in SPOTS:
