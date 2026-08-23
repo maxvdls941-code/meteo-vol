@@ -8,7 +8,7 @@ st.set_page_config(page_title="Météo Vol Paramoteur", page_icon="🪂", layout
 
 st.title("🪂 Météo Vol Paramoteur")
 
-# Options compactes en haut de page
+# Options compactes
 col_opt1, col_opt2 = st.columns([2, 1])
 
 with col_opt1:
@@ -21,7 +21,7 @@ with col_opt2:
         index=0
     )
 
-# Gestion du minutage pour le rafraîchissement automatique
+# Gestion du minutage pour l'auto-rafraîchissement
 refresh_ms_map = {
     "30 minutes": 30 * 60 * 1000,
     "1 heure": 60 * 60 * 1000,
@@ -39,7 +39,6 @@ if refresh_ms:
         </script>
     """, height=0)
 
-# Affichage de l'heure de dernière mise à jour
 now_str = datetime.now().strftime("%H:%M:%S")
 st.info(f"🕒 **Dernière actualisation :** {now_str}")
 
@@ -48,7 +47,21 @@ SPOTS = [
     {"name": "Epfig", "lat": 48.3582, "lon": 7.4636}
 ]
 
-# 2 colonnes côte à côte
+def get_cardinal(deg):
+    dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", 
+            "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"]
+    idx = int((deg + 11.25) // 22.5) % 16
+    return f"{dirs[idx]} ({int(deg)}°)"
+
+def get_plage_horaire(heure_dt):
+    h = heure_dt.hour
+    if h < 11:
+        return "🌅 Matin"
+    elif 11 <= h < 17:
+        return "☀️ Midi"
+    else:
+        return "🌇 Soir"
+
 cols = st.columns(2)
 
 for i, spot in enumerate(SPOTS):
@@ -77,6 +90,7 @@ for i, spot in enumerate(SPOTS):
                 delta_raf = rafales - v_sol
                 v_alt = row.get("wind_speed_180m", 0)
                 pluie = row.get("precipitation", 0)
+                dir_deg = row.get("wind_direction_10m", 0)
 
                 raisons = []
                 if v_sol >= 12:
@@ -94,16 +108,17 @@ for i, spot in enumerate(SPOTS):
                     tableau.append({
                         "Statut": "🟢 OK" if is_volable else "🔴 Non",
                         "Heure": row["time"].strftime("%H:%M"),
+                        "Plage": get_plage_horaire(row["time"]),
                         "Sol": round(v_sol, 1),
                         "ΔRaf": round(delta_raf, 1),
                         "180m": round(v_alt, 1),
+                        "Dir.": get_cardinal(dir_deg),
                         "Pluie": round(pluie, 1),
                         "Cause du rejet": "—" if is_volable else ", ".join(raisons)
                     })
 
             if tableau:
                 df_res = pd.DataFrame(tableau)
-                # Hauteur dynamique pour afficher TOUTES les lignes jusqu'au bas
                 hauteur_dynamique = (len(df_res) + 1) * 35 + 10
                 st.dataframe(df_res, hide_index=True, use_container_width=True, height=hauteur_dynamique)
             else:
