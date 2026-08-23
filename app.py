@@ -2,10 +2,13 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="Météo Vol Paramoteur", page_icon="🪂", layout="centered")
+st.set_page_config(page_title="Météo Vol Paramoteur", page_icon="🪂", layout="wide")
 
 st.title("🪂 Météo Vol Paramoteur")
-st.caption("Surveillance automatique pour Andolsheim et Epfig")
+st.caption("Surveillance météo complète pour Andolsheim et Epfig")
+
+# Option pour afficher tout ou seulement les créneaux volables
+afficher_tout = st.checkbox("Afficher toutes les heures de la journée (même non volables)", value=True)
 
 SPOTS = [
     {"name": "Andolsheim", "lat": 48.0614, "lon": 7.4147},
@@ -31,8 +34,9 @@ for spot in SPOTS:
         ss = pd.to_datetime(res["daily"]["sunset"][0])
         now = pd.Timestamp.now()
 
+        # Filtrer de l'heure actuelle (ou du lever du soleil) jusqu'au coucher du soleil
         df_jour = df[(df["time"] >= max(now, sr)) & (df["time"] <= ss)]
-        creneaux = []
+        tableau = []
 
         for _, row in df_jour.iterrows():
             v_sol = row.get("wind_speed_10m", 0)
@@ -41,19 +45,35 @@ for spot in SPOTS:
             v_alt = row.get("wind_speed_180m", 0)
             pluie = row.get("precipitation", 0)
 
-            if v_sol < 12 and delta_raf < 5 and v_alt < 25 and pluie == 0:
-                creneaux.append({
+            # Analyse des raisons de rejet
+            raisons = []
+            if v_sol >= 12:
+                raisons.append("Vent sol (≥ 12 km/h)")
+            if delta_raf >= 5:
+                raisons.append("Rafales (Δ ≥ 5 km/h)")
+            if v_alt >= 25:
+                raisons.append("Vent 180m (≥ 25 km/h)")
+            if pluie > 0:
+                raisons.append("Pluie (> 0 mm)")
+
+            is_volable = (len(raisons) == 0)
+
+            if is_volable or afficher_tout:
+                tableau.append({
+                    "Statut": "🟢 OK" if is_volable else "🔴 Non volable",
                     "Heure": row["time"].strftime("%H:%M"),
                     "Vent sol (km/h)": round(v_sol, 1),
                     "Delta Rafales (km/h)": round(delta_raf, 1),
-                    "Vent 180m (km/h)": round(v_alt, 1)
+                    "Vent 180m (km/h)": round(v_alt, 1),
+                    "Pluie (mm)": round(pluie, 1),
+                    "Cause du rejet": "—" if is_volable else ", ".join(raisons)
                 })
 
-        if creneaux:
-            st.success(f"{len(creneaux)} créneau(x) volable(s) disponible(s)")
-            st.dataframe(pd.DataFrame(creneaux), hide_index=True, use_container_width=True)
+        if tableau:
+            df_res = pd.DataFrame(tableau)
+            st.dataframe(df_res, hide_index=True, use_container_width=True)
         else:
-            st.warning("Aucun créneau volable détecté pour le reste de la journée.")
+            st.warning("Aucun créneau ne correspond aux critères actuels.")
     else:
         st.error("Erreur lors de la récupération des données météo.")
     
