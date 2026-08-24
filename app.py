@@ -8,7 +8,7 @@ st.set_page_config(page_title="Météo Vol Paramoteur", page_icon="🪂", layout
 
 st.title("🪂 Météo Vol Paramoteur")
 
-# Options compactes
+# Options compactes en haut de page
 col_opt1, col_opt2 = st.columns([2, 1])
 
 with col_opt1:
@@ -42,15 +42,39 @@ if refresh_ms:
 now_str = datetime.now().strftime("%H:%M:%S")
 st.info(f"🕒 **Dernière actualisation :** {now_str}")
 
+# Liste de base des spots
 SPOTS = [
     {"name": "Aventure Mulhouse (Terciel)", "lat": 47.8180, "lon": 7.1200},
     {"name": "Epfig", "lat": 48.3582, "lon": 7.4636}
 ]
 
+# Champ de recherche de ville
+st.markdown("### 🔍 Ajouter un lieu personnalisé")
+col_search1, col_search2 = st.columns([3, 1])
+
+with col_search1:
+    ville_recherchee = st.text_input("Entre une ville ou un lieu :", placeholder="Ex: Colmar, Cernay, Uffholtz...")
+
+if ville_recherchee:
+    # Recherche des coordonnées via l'API Open-Meteo Geocoding
+    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={ville_recherchee}&count=1&language=fr&format=json"
+    geo_res = requests.get(geo_url).json()
+    
+    if "results" in geo_res and len(geo_res["results"]) > 0:
+        lieu = geo_res["results"][0]
+        nom_lieu = f"{lieu['name']} ({lieu.get('admin1', '')})"
+        lat_lieu = lieu["latitude"]
+        lon_lieu = lieu["longitude"]
+        
+        # Ajout du lieu recherché en premier spot
+        SPOTS.insert(0, {"name": nom_lieu, "lat": lat_lieu, "lon": lon_lieu})
+        st.success(f"📍 Lieu trouvé : **{nom_lieu}** ({lat_lieu:.4f}, {lon_lieu:.4f})")
+    else:
+        st.error("Lieu introuvable. Essaie avec un autre nom de ville.")
+
 def get_cardinal(deg):
     dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", 
             "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"]
-    # Flèches indiquant la direction vers laquelle va le vent
     arrows = ["⬇️", "⬇️", "↙️", "↙️", "⬅️", "⬅️", "↖️", "↖️", 
               "⬆️", "⬆️", "↗️", "↗️", "➡️", "➡️", "↘️", "↘️"]
     idx = int((deg + 11.25) // 22.5) % 16
@@ -65,7 +89,8 @@ def get_plage_horaire(heure_dt):
     else:
         return "🌇 Soir"
 
-cols = st.columns(2)
+# Répartition dynamique des colonnes selon le nombre de spots
+cols = st.columns(len(SPOTS))
 
 for i, spot in enumerate(SPOTS):
     with cols[i]:
