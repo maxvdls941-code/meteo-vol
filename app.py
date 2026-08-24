@@ -8,7 +8,7 @@ st.set_page_config(page_title="Météo Vol Paramoteur", page_icon="🪂", layout
 
 st.title("🪂 Météo Vol Paramoteur")
 
-# Options compactes en haut de page
+# Options compactes
 col_opt1, col_opt2 = st.columns([2, 1])
 
 with col_opt1:
@@ -42,7 +42,6 @@ if refresh_ms:
 now_str = datetime.now().strftime("%H:%M:%S")
 st.info(f"🕒 **Dernière actualisation :** {now_str}")
 
-# Liste de base des spots
 SPOTS = [
     {"name": "Aventure Mulhouse (Terciel)", "lat": 47.8180, "lon": 7.1200},
     {"name": "Epfig", "lat": 48.3582, "lon": 7.4636}
@@ -56,7 +55,6 @@ with col_search1:
     ville_recherchee = st.text_input("Entre une ville ou un lieu :", placeholder="Ex: Colmar, Cernay, Uffholtz...")
 
 if ville_recherchee:
-    # Recherche des coordonnées via l'API Open-Meteo Geocoding
     geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={ville_recherchee}&count=1&language=fr&format=json"
     geo_res = requests.get(geo_url).json()
     
@@ -65,8 +63,6 @@ if ville_recherchee:
         nom_lieu = f"{lieu['name']} ({lieu.get('admin1', '')})"
         lat_lieu = lieu["latitude"]
         lon_lieu = lieu["longitude"]
-        
-        # Ajout du lieu recherché en premier spot
         SPOTS.insert(0, {"name": nom_lieu, "lat": lat_lieu, "lon": lon_lieu})
         st.success(f"📍 Lieu trouvé : **{nom_lieu}** ({lat_lieu:.4f}, {lon_lieu:.4f})")
     else:
@@ -89,16 +85,17 @@ def get_plage_horaire(heure_dt):
     else:
         return "🌇 Soir"
 
-# Répartition dynamique des colonnes selon le nombre de spots
 cols = st.columns(len(SPOTS))
 
 for i, spot in enumerate(SPOTS):
     with cols[i]:
         st.subheader(f"📍 {spot['name']}")
         
+        # URL configurée directement sur le modèle AROME de Météo-France
         url = (f"https://api.open-meteo.com/v1/forecast?latitude={spot['lat']}&longitude={spot['lon']}"
                f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,precipitation"
-               f"&daily=sunrise,sunset&wind_speed_unit=kmh&timezone=Europe%2FParis")
+               f"&daily=sunrise,sunset&wind_speed_unit=kmh&timezone=Europe%2FParis"
+               f"&models=meteofrance_arome")
         
         res = requests.get(url).json()
         
