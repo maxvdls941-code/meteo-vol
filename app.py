@@ -91,11 +91,10 @@ for i, spot in enumerate(SPOTS):
     with cols[i]:
         st.subheader(f"📍 {spot['name']}")
         
-        # URL configurée directement sur le modèle AROME de Météo-France
+        # Reconstitution de l'URL valide multi-modèles (support du 180m)
         url = (f"https://api.open-meteo.com/v1/forecast?latitude={spot['lat']}&longitude={spot['lon']}"
                f"&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_180m,precipitation"
-               f"&daily=sunrise,sunset&wind_speed_unit=kmh&timezone=Europe%2FParis"
-               f"&models=meteofrance_arome")
+               f"&daily=sunrise,sunset&wind_speed_unit=kmh&timezone=Europe%2FParis")
         
         res = requests.get(url).json()
         
