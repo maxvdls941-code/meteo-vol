@@ -7,7 +7,7 @@ st.set_page_config(page_title="Météo Vol ULM", page_icon="🪂", layout="cente
 
 JOURS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
-# Cache de 30 minutes (1800s) pour éviter les blocages API
+# Cache de 30 minutes pour éviter les blocages API
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_weather(lat: float, lon: float, days: int = 3):
     url = "https://api.open-meteo.com/v1/forecast"
@@ -44,79 +44,6 @@ def geocode_location(location_name: str):
     if results:
         return results[0]["latitude"], results[0]["longitude"], results[0]["name"]
     return None
-
-# Génération du tableau avec la première colonne figée (Sticky)
-def render_sticky_table(df):
-    html = """
-    <style>
-    .table-container {
-        overflow-x: auto;
-        margin-bottom: 1rem;
-        border: 1px solid #e6e6e6;
-        border-radius: 8px;
-    }
-    .custom-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-family: sans-serif;
-        font-size: 13px;
-    }
-    .custom-table th, .custom-table td {
-        padding: 8px 10px;
-        text-align: left;
-        border-bottom: 1px solid #eee;
-        white-space: nowrap;
-    }
-    .custom-table th {
-        background-color: #f7f9fb;
-        font-weight: 600;
-        color: #333;
-    }
-    .custom-table th:first-child, .custom-table td:first-child {
-        position: sticky;
-        left: 0;
-        background-color: #ffffff;
-        z-index: 2;
-        font-weight: 600;
-        border-right: 2px solid #e6e6e6;
-        box-shadow: 2px 0 4px rgba(0,0,0,0.05);
-    }
-    </style>
-    <div class="table-container">
-    <table class="custom-table">
-    <thead>
-        <tr>
-            <th>Jour & Heure</th>
-            <th>Statut</th>
-            <th>V10 (km/h)</th>
-            <th>Raf (km/h)</th>
-            <th>V180 (km/h)</th>
-            <th>Pluie (mm)</th>
-            <th>Dir (°)</th>
-            <th>Cause(s) de rejet</th>
-        </tr>
-    </thead>
-    <tbody>
-    """
-    for _, row in df.iterrows():
-        html += f"""
-        <tr>
-            <td>{row['Jour & Heure']}</td>
-            <td>{row['Statut']}</td>
-            <td>{row['Vent 10m (km/h)']}</td>
-            <td>{row['Rafales (km/h)']}</td>
-            <td>{row['Vent 180m (km/h)']}</td>
-            <td>{row['Pluie (mm)']}</td>
-            <td>{row['Dir. (°)']}</td>
-            <td>{row['Cause(s) de rejet']}</td>
-        </tr>
-        """
-    html += """
-    </tbody>
-    </table>
-    </div>
-    """
-    return html
 
 # --- En-tête ---
 
@@ -193,7 +120,7 @@ for spot in spots:
         nb_heures = horizon * 24
         df_next = df_hourly[df_hourly["time"] >= now].head(nb_heures).copy()
 
-        # Évaluation du vol et explication détaillée des rejets
+        # Évaluation du vol et explication des rejets
         def eval_flight(row):
             w10 = row["wind_speed_10m"]
             g10 = row["wind_gusts_10m"]
@@ -212,8 +139,6 @@ for spot in spots:
                 rejets.append(f"Rafales > 25 km/h ({g10:.0f})")
             if w180 > 25:
                 rejets.append(f"Vent 180m > 25 km/h ({w180:.0f})")
-
-            # Seuil thermique : Plage 10h-17h + fort rayonnement (>350 W/m²) ou CAPE élevé (>50 J/kg)
             if (10 <= heure <= 17) and (rad > 350 or cape > 50):
                 rejets.append("Risque thermique / Turbulences")
 
@@ -255,9 +180,7 @@ for spot in spots:
         ]
 
         st.markdown(f"**📅 Prévisions sur {horizon} jour{'s' if horizon > 1 else ''} :**")
-        
-        # Affichage du tableau avec première colonne figée
-        st.markdown(render_sticky_table(display_df), unsafe_allow_html=True)
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     except Exception:
         st.error("Erreur météo.")
