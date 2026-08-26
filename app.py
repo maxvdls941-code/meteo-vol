@@ -185,7 +185,6 @@ for spot in spots:
             if (10 <= heure <= 17) and (rad > 350 or cape > 50):
                 rejets.append("Risque thermique / Turbulences")
 
-            # Détection d'inversion thermique (Air lisse)
             inversion = (t180 >= t2)
 
             if not rejets:
@@ -228,16 +227,52 @@ for spot in spots:
             "Cause(s) de rejet"
         ]
 
+        # Bulle d'explication des termes (Popover)
+        with st.popover("💡 Légende & Explication des termes"):
+            st.markdown("""
+            **🧊 Inversion thermique (Air lisse) :**
+            L'air en altitude (180 m) est plus chaud ou égal à l'air au sol. Cela bloque les mouvements verticaux et garantit un air calme et très stable, idéal pour le vol matinal.
+
+            **☀️ Risque thermique / Turbulences :**
+            Entre 10h et 17h, le rayonnement solaire chauffe le sol et crée de fortes ascendances/dégueulantes hachées, même si le vent horizontal reste faible.
+
+            **☁️ Nuages bas (%) :**
+            Indique la couverture nuageuse à basse altitude. Supérieur à 80 %, le risque de plafond bas ou de brouillard est élevé.
+
+            **⏱️ Horaires VFR :**
+            Les tableaux filtrent automatiquement les heures de nuit et ne conservent que le créneau officiel du **lever du soleil (-30 min)** au **coucher du soleil (+30 min)**.
+            """)
+
+        # Configuration des info-bulles sur les colonnes du tableau
+        col_config = {
+            "Statut": st.column_config.TextColumn(
+                "Statut",
+                help="🟢 Volable | 🟠 Limite | 🔴 Non volable\n🧊 Inversion : Air très lisse et stable."
+            ),
+            "Vent 180m (km/h)": st.column_config.NumberColumn(
+                "Vent 180m (km/h)",
+                help="Gradient de vent en altitude (limite max recommandée : 25 km/h)."
+            ),
+            "Nuages bas (%)": st.column_config.NumberColumn(
+                "Nuages bas (%)",
+                help="Couverture à basse altitude (risque de plafond écrasé si > 80%)."
+            ),
+            "Cause(s) de rejet": st.column_config.TextColumn(
+                "Cause(s) de rejet",
+                help="Raison(s) précise(s) du classement en Limite ou Non volable."
+            )
+        }
+
         # Vues par onglets
         tab_full, tab_best = st.tabs(["📊 Prévisions VFR Jour", "⭐ Meilleurs créneaux (🟢 Volable)"])
 
         with tab_full:
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.dataframe(display_df, use_container_width=True, hide_index=True, column_config=col_config)
 
         with tab_best:
             best_df = display_df[display_df["Statut"].str.contains("🟢 Volable")].copy()
             if not best_df.empty:
-                st.dataframe(best_df, use_container_width=True, hide_index=True)
+                st.dataframe(best_df, use_container_width=True, hide_index=True, column_config=col_config)
             else:
                 st.info("Aucun créneau 🟢 parfaitement volable trouvé sur cette période.")
 
