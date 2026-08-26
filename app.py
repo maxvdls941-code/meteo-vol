@@ -7,7 +7,27 @@ st.set_page_config(page_title="Météo Vol ULM", page_icon="🪂", layout="cente
 
 JOURS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
-# Cache de 30 minutes (1800s) pour éviter les blocages API
+# Conversion direction en degrés vers flèche cardinale
+def format_wind_dir(deg):
+    if deg is None or pd.isna(deg):
+        return "-"
+    deg = float(deg) % 360
+    dirs = [
+        ("⬇️ N", 337.5, 360), ("⬇️ N", 0, 22.5),
+        ("↙️ NE", 22.5, 67.5),
+        ("⬅️ E", 67.5, 112.5),
+        ("↖️ SE", 112.5, 157.5),
+        ("⬆️ S", 157.5, 202.5),
+        ("↗️ SW", 202.5, 247.5),
+        ("➡️ W", 247.5, 292.5),
+        ("↘️ NW", 292.5, 337.5)
+    ]
+    for label, start, end in dirs:
+        if start <= deg < end or (start == 337.5 and deg >= 337.5):
+            return f"{int(deg)}° {label}"
+    return f"{int(deg)}°"
+
+# Cache API 30 minutes
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_weather(lat: float, lon: float, days: int = 3):
     url = "https://api.open-meteo.com/v1/forecast"
@@ -17,6 +37,7 @@ def fetch_weather(lat: float, lon: float, days: int = 3):
         "current": ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"],
         "hourly": [
             "temperature_2m",
+            "temperature_180m",
             "wind_speed_10m",
             "wind_gusts_10m",
             "precipitation",
@@ -24,7 +45,8 @@ def fetch_weather(lat: float, lon: float, days: int = 3):
             "wind_speed_180m",
             "wind_direction_180m",
             "shortwave_radiation",
-            "cape"
+            "cape",
+            "cloud_cover_low"
         ],
         "daily": ["sunrise", "sunset"],
         "forecast_days": days,
@@ -34,7 +56,7 @@ def fetch_weather(lat: float, lon: float, days: int = 3):
     response.raise_for_status()
     return response.json()
 
-# Cache de 24h pour la géolocalisation
+# Cache Géocodage 24h
 @st.cache_data(ttl=86400, show_spinner=False)
 def geocode_location(location_name: str):
     url = "https://geocoding-api.open-meteo.com/v1/search"
@@ -85,7 +107,7 @@ if custom_place.strip():
 
 st.divider()
 
-# --- Affichage des spots et créneaux horaires ---
+# --- Affichage des spots ---
 
 for spot in spots:
     st.subheader(f"📍 {spot['name']}")
@@ -101,10 +123,9 @@ for spot in spots:
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Température", f"{temp} °C")
-        c2.metric("Vent sol (10m)", f"{wind} km/h", delta=f"{wind_dir}°", delta_color="off")
+        c2.metric("Vent sol (10m)", f"{wind} km/h", delta=format_wind_dir(wind_dir), delta_color="off")
         c3.metric("Rafales", f"{gusts} km/h")
 
-        # Statut instantané
         if wind <= 18 and gusts <= 25:
             st.success("✅ **Conditions actuelles favorables au vol**")
         elif wind <= 22 and gusts <= 30:
@@ -112,32 +133,32 @@ for spot in spots:
         else:
             st.error("❌ **Conditions actuelles défavorables**")
 
-        # Récupération des heures de lever et coucher du soleil
+        # Éphémérides VFR
         daily = data.get("daily", {})
         sunrises = pd.to_datetime(daily.get("sunrise", []))
         sunsets = pd.to_datetime(daily.get("sunset", []))
 
-        # Traitement du prévisionnel horaire
+        # Filtrage horaire
         hourly = data.get("hourly", {})
         df_hourly = pd.DataFrame(hourly)
         df_hourly["time"] = pd.to_datetime(df_hourly["time"])
         
         now = datetime.now()
         end_time = now + pd.Timedelta(days=horizon)
-        
-        # Filtrage temporal selon l'horizon choisi
         df_filtered = df_hourly[(df_hourly["time"] >= now) & (df_hourly["time"] <= end_time)].copy()
 
-        # Filtrage spécifique : conserver uniquement les heures du jour (entre lever et coucher)
-        def is_daylight(t):
+        # Filtrage VFR Jour (-30 min sunrise / +30 min sunset)
+        def is_vfr_daylight(t):
             for sr, ss in zip(sunrises, sunsets):
-                if sr <= t <= ss:
+                vfr_start = sr - pd.Timedelta(minutes=30)
+                vfr_end = ss + pd.Timedelta(minutes=30)
+                if vfr_start <= t <= vfr_end:
                     return True
             return False
 
-        df_next = df_filtered[df_filtered["time"].apply(is_daylight)].copy()
+        df_next = df_filtered[df_filtered["time"].apply(is_vfr_daylight)].copy()
 
-        # Évaluation du vol et explication des rejets
+        # Évaluation avancée du vol
         def eval_flight(row):
             w10 = row["wind_speed_10m"]
             g10 = row["wind_gusts_10m"]
@@ -145,6 +166,9 @@ for spot in spots:
             w180 = row.get("wind_speed_180m", 0)
             rad = row.get("shortwave_radiation", 0)
             cape = row.get("cape", 0)
+            clouds = row.get("cloud_cover_low", 0)
+            t2 = row.get("temperature_2m", 0)
+            t180 = row.get("temperature_180m", 0)
             heure = row["time"].hour
 
             rejets = []
@@ -156,11 +180,17 @@ for spot in spots:
                 rejets.append(f"Rafales > 25 km/h ({g10:.0f})")
             if w180 > 25:
                 rejets.append(f"Vent 180m > 25 km/h ({w180:.0f})")
+            if clouds > 80:
+                rejets.append(f"Nuages bas ({clouds:.0f}%)")
             if (10 <= heure <= 17) and (rad > 350 or cape > 50):
                 rejets.append("Risque thermique / Turbulences")
 
+            # Détection d'inversion thermique (Air lisse)
+            inversion = (t180 >= t2)
+
             if not rejets:
-                return "🟢 Volable", "-"
+                statut = "🟢 Volable" + (" 🧊 Inversion" if inversion else "")
+                return statut, "-"
             elif w10 <= 22 and g10 <= 30 and w180 <= 30 and p == 0:
                 return "🟠 Limite", ", ".join(rejets)
             else:
@@ -170,18 +200,19 @@ for spot in spots:
         df_next["Volabilité"] = [r[0] for r in eval_res]
         df_next["Cause(s) de rejet"] = [r[1] for r in eval_res]
 
-        # Format du jour et de l'heure
         df_next["Nom_Jour"] = df_next["time"].dt.dayofweek.map(lambda x: JOURS_FR[x])
         df_next["Jour & Heure"] = df_next["Nom_Jour"] + " " + df_next["time"].dt.strftime("%d/%m %H:00")
-        
+        df_next["Dir. Format"] = df_next["wind_direction_10m"].apply(format_wind_dir)
+
         display_df = df_next[[
             "Jour & Heure",
             "Volabilité",
             "wind_speed_10m",
             "wind_gusts_10m",
             "wind_speed_180m",
+            "cloud_cover_low",
             "precipitation",
-            "wind_direction_10m",
+            "Dir. Format",
             "Cause(s) de rejet"
         ]].copy()
         
@@ -191,15 +222,26 @@ for spot in spots:
             "Vent 10m (km/h)",
             "Rafales (km/h)",
             "Vent 180m (km/h)",
+            "Nuages bas (%)",
             "Pluie (mm)",
-            "Dir. (°)",
+            "Dir. Vent",
             "Cause(s) de rejet"
         ]
 
-        st.markdown(f"**📅 Créneaux de jour (prévisions sur {horizon} jour{'s' if horizon > 1 else ''}) :**")
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        # Vues par onglets
+        tab_full, tab_best = st.tabs(["📊 Prévisions VFR Jour", "⭐ Meilleurs créneaux (🟢 Volable)"])
+
+        with tab_full:
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+        with tab_best:
+            best_df = display_df[display_df["Statut"].str.contains("🟢 Volable")].copy()
+            if not best_df.empty:
+                st.dataframe(best_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("Aucun créneau 🟢 parfaitement volable trouvé sur cette période.")
 
     except Exception:
-        st.error("Erreur météo.")
+        st.error("Erreur d'acquisition des données météo.")
     
     st.divider()
