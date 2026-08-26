@@ -22,7 +22,9 @@ def fetch_weather(lat: float, lon: float, days: int = 3):
             "precipitation",
             "wind_direction_10m",
             "wind_speed_180m",
-            "wind_direction_180m"
+            "wind_direction_180m",
+            "shortwave_radiation",
+            "cape"
         ],
         "forecast_days": days,
         "timezone": "auto"
@@ -118,12 +120,15 @@ for spot in spots:
         nb_heures = horizon * 24
         df_next = df_hourly[df_hourly["time"] >= now].head(nb_heures).copy()
 
-        # Évaluation du vol et explication détaillée des rejets
+        # Évaluation du vol avec détection du risque thermique
         def eval_flight(row):
             w10 = row["wind_speed_10m"]
             g10 = row["wind_gusts_10m"]
             p = row["precipitation"]
             w180 = row.get("wind_speed_180m", 0)
+            rad = row.get("shortwave_radiation", 0)
+            cape = row.get("cape", 0)
+            heure = row["time"].hour
 
             rejets = []
             if p > 0:
@@ -134,6 +139,10 @@ for spot in spots:
                 rejets.append(f"Rafales > 25 km/h ({g10:.0f})")
             if w180 > 25:
                 rejets.append(f"Vent 180m > 25 km/h ({w180:.0f})")
+
+            # Seuil thermique : Plage 10h-17h + fort rayonnement (>350 W/m²) ou CAPE élevé (>50 J/kg)
+            if (10 <= heure <= 17) and (rad > 350 or cape > 50):
+                rejets.append("Risque thermique / Turbulences")
 
             if not rejets:
                 return "🟢 Volable", "-"
