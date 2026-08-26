@@ -5,15 +5,19 @@ import streamlit as st
 
 st.set_page_config(page_title="Météo Vol ULM", page_icon="🪂", layout="centered")
 
-# Cache de 30 minutes (1800s) pour éviter les erreurs HTTP 429
+# Liste des jours en français (garantit le bon affichage sur les serveurs distants)
+JOURS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+
+# Cache de 30 minutes (1800s) pour éviter les blocages API
 @st.cache_data(ttl=1800, show_spinner=False)
-def fetch_weather(lat: float, lon: float):
+def fetch_weather(lat: float, lon: float, days: int = 3):
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
         "longitude": lon,
         "current": ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"],
         "hourly": ["temperature_2m", "wind_speed_10m", "wind_gusts_10m", "precipitation", "wind_direction_10m"],
+        "forecast_days": days,
         "timezone": "auto"
     }
     response = requests.get(url, params=params, timeout=10)
@@ -42,6 +46,15 @@ with col_refresh:
 
 st.caption(f"🕒 **Dernière actualisation :** {datetime.now().strftime('%H:%M:%S')}")
 
+# --- Option : Horizon de prévision ---
+
+horizon = st.radio(
+    "📅 **Horizon de prévision :**",
+    options=[1, 2, 3],
+    format_func=lambda x: f"{x} jour{'s' if x > 1 else ''} ({x * 24}h)",
+    horizontal=True
+)
+
 # --- Recherche de lieu ---
 
 with st.expander("🔍 **Ajouter un lieu personnalisé**", expanded=False):
@@ -67,7 +80,7 @@ st.divider()
 for spot in spots:
     st.subheader(f"📍 {spot['name']}")
     try:
-        data = fetch_weather(spot["lat"], spot["lon"])
+        data = fetch_weather(spot["lat"], spot["lon"], days=3)
         current = data.get("current", {})
         
         # Conditions actuelles
@@ -81,7 +94,7 @@ for spot in spots:
         c2.metric("Vent moyen", f"{wind} km/h", delta=f"{wind_dir}°", delta_color="off")
         c3.metric("Rafales", f"{gusts} km/h")
 
-        # Bannière d'état instantané
+        # Statut instantané
         if wind <= 18 and gusts <= 25:
             st.success("✅ **Conditions actuelles favorables au vol**")
         elif wind <= 22 and gusts <= 30:
@@ -89,16 +102,16 @@ for spot in spots:
         else:
             st.error("❌ **Conditions actuelles défavorables**")
 
-        # Traitement du prévisionnel horaire (12 prochaines heures)
+        # Filtrage et mise en forme selon l'horizon sélectionné
         hourly = data.get("hourly", {})
         df_hourly = pd.DataFrame(hourly)
         df_hourly["time"] = pd.to_datetime(df_hourly["time"])
         
-        # Filtrer à partir de l'heure actuelle sur les 12 prochaines heures
         now = datetime.now()
-        df_next = df_hourly[df_hourly["time"] >= now].head(12).copy()
+        nb_heures = horizon * 24
+        df_next = df_hourly[df_hourly["time"] >= now].head(nb_heures).copy()
 
-        # Évaluation du statut pour chaque heure
+        # Évaluation de la volabilité par heure
         def eval_flight(row):
             w = row["wind_speed_10m"]
             g = row["wind_gusts_10m"]
@@ -111,13 +124,15 @@ for spot in spots:
                 return "🔴 Non volable"
 
         df_next["Volabilité"] = df_next.apply(eval_flight, axis=1)
-        df_next["Heure"] = df_next["time"].dt.strftime("%H:%M")
         
-        # Renommage des colonnes pour l'affichage
-        display_df = df_next[["Heure", "Volabilité", "wind_speed_10m", "wind_gusts_10m", "precipitation", "wind_direction_10m"]].copy()
-        display_df.columns = ["Heure", "Statut", "Vent (km/h)", "Rafales (km/h)", "Pluie (mm)", "Dir. (°)"]
+        # Ajout du nom du jour en français (ex: "Jeudi 27/08 14:00")
+        df_next["Nom_Jour"] = df_next["time"].dt.dayofweek.map(lambda x: JOURS_FR[x])
+        df_next["Jour & Heure"] = df_next["Nom_Jour"] + " " + df_next["time"].dt.strftime("%d/%m %H:00")
+        
+        display_df = df_next[["Jour & Heure", "Volabilité", "wind_speed_10m", "wind_gusts_10m", "precipitation", "wind_direction_10m"]].copy()
+        display_df.columns = ["Jour & Heure", "Statut", "Vent (km/h)", "Rafales (km/h)", "Pluie (mm)", "Dir. (°)"]
 
-        st.markdown("**📅 Créneaux horaires prévus :**")
+        st.markdown(f"**📅 Prévisions sur {horizon} jour{'s' if horizon > 1 else ''} :**")
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     except Exception:
