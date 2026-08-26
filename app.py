@@ -45,6 +45,79 @@ def geocode_location(location_name: str):
         return results[0]["latitude"], results[0]["longitude"], results[0]["name"]
     return None
 
+# Génération du tableau avec la première colonne figée (Sticky)
+def render_sticky_table(df):
+    html = """
+    <style>
+    .table-container {
+        overflow-x: auto;
+        margin-bottom: 1rem;
+        border: 1px solid #e6e6e6;
+        border-radius: 8px;
+    }
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: sans-serif;
+        font-size: 13px;
+    }
+    .custom-table th, .custom-table td {
+        padding: 8px 10px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+        white-space: nowrap;
+    }
+    .custom-table th {
+        background-color: #f7f9fb;
+        font-weight: 600;
+        color: #333;
+    }
+    .custom-table th:first-child, .custom-table td:first-child {
+        position: sticky;
+        left: 0;
+        background-color: #ffffff;
+        z-index: 2;
+        font-weight: 600;
+        border-right: 2px solid #e6e6e6;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+    }
+    </style>
+    <div class="table-container">
+    <table class="custom-table">
+    <thead>
+        <tr>
+            <th>Jour & Heure</th>
+            <th>Statut</th>
+            <th>V10 (km/h)</th>
+            <th>Raf (km/h)</th>
+            <th>V180 (km/h)</th>
+            <th>Pluie (mm)</th>
+            <th>Dir (°)</th>
+            <th>Cause(s) de rejet</th>
+        </tr>
+    </thead>
+    <tbody>
+    """
+    for _, row in df.iterrows():
+        html += f"""
+        <tr>
+            <td>{row['Jour & Heure']}</td>
+            <td>{row['Statut']}</td>
+            <td>{row['Vent 10m (km/h)']}</td>
+            <td>{row['Rafales (km/h)']}</td>
+            <td>{row['Vent 180m (km/h)']}</td>
+            <td>{row['Pluie (mm)']}</td>
+            <td>{row['Dir. (°)']}</td>
+            <td>{row['Cause(s) de rejet']}</td>
+        </tr>
+        """
+    html += """
+    </tbody>
+    </table>
+    </div>
+    """
+    return html
+
 # --- En-tête ---
 
 col_header, col_refresh = st.columns([2, 1])
@@ -120,7 +193,7 @@ for spot in spots:
         nb_heures = horizon * 24
         df_next = df_hourly[df_hourly["time"] >= now].head(nb_heures).copy()
 
-        # Évaluation du vol avec détection du risque thermique
+        # Évaluation du vol et explication détaillée des rejets
         def eval_flight(row):
             w10 = row["wind_speed_10m"]
             g10 = row["wind_gusts_10m"]
@@ -182,7 +255,9 @@ for spot in spots:
         ]
 
         st.markdown(f"**📅 Prévisions sur {horizon} jour{'s' if horizon > 1 else ''} :**")
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        
+        # Affichage du tableau avec première colonne figée
+        st.markdown(render_sticky_table(display_df), unsafe_allow_html=True)
 
     except Exception:
         st.error("Erreur météo.")
