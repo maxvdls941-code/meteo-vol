@@ -7,7 +7,7 @@ st.set_page_config(page_title="Météo Vol ULM", page_icon="🪂", layout="cente
 
 JOURS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
-# Cache de 30 minutes pour éviter les blocages API
+# Cache de 30 minutes (1800s) pour éviter les blocages API
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_weather(lat: float, lon: float, days: int = 3):
     url = "https://api.open-meteo.com/v1/forecast"
@@ -26,6 +26,7 @@ def fetch_weather(lat: float, lon: float, days: int = 3):
             "shortwave_radiation",
             "cape"
         ],
+        "daily": ["sunrise", "sunset"],
         "forecast_days": days,
         "timezone": "auto"
     }
@@ -111,14 +112,30 @@ for spot in spots:
         else:
             st.error("❌ **Conditions actuelles défavorables**")
 
-        # Filtrage horaire
+        # Récupération des heures de lever et coucher du soleil
+        daily = data.get("daily", {})
+        sunrises = pd.to_datetime(daily.get("sunrise", []))
+        sunsets = pd.to_datetime(daily.get("sunset", []))
+
+        # Traitement du prévisionnel horaire
         hourly = data.get("hourly", {})
         df_hourly = pd.DataFrame(hourly)
         df_hourly["time"] = pd.to_datetime(df_hourly["time"])
         
         now = datetime.now()
-        nb_heures = horizon * 24
-        df_next = df_hourly[df_hourly["time"] >= now].head(nb_heures).copy()
+        end_time = now + pd.Timedelta(days=horizon)
+        
+        # Filtrage temporal selon l'horizon choisi
+        df_filtered = df_hourly[(df_hourly["time"] >= now) & (df_hourly["time"] <= end_time)].copy()
+
+        # Filtrage spécifique : conserver uniquement les heures du jour (entre lever et coucher)
+        def is_daylight(t):
+            for sr, ss in zip(sunrises, sunsets):
+                if sr <= t <= ss:
+                    return True
+            return False
+
+        df_next = df_filtered[df_filtered["time"].apply(is_daylight)].copy()
 
         # Évaluation du vol et explication des rejets
         def eval_flight(row):
@@ -179,7 +196,7 @@ for spot in spots:
             "Cause(s) de rejet"
         ]
 
-        st.markdown(f"**📅 Prévisions sur {horizon} jour{'s' if horizon > 1 else ''} :**")
+        st.markdown(f"**📅 Créneaux de jour (prévisions sur {horizon} jour{'s' if horizon > 1 else ''}) :**")
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     except Exception:
