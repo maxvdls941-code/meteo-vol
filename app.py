@@ -5,7 +5,6 @@ import streamlit as st
 
 st.set_page_config(page_title="Météo Vol ULM", page_icon="🪂", layout="centered")
 
-# Liste des jours en français (garantit le bon affichage sur les serveurs distants)
 JOURS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
 # Cache de 30 minutes (1800s) pour éviter les blocages API
@@ -16,7 +15,15 @@ def fetch_weather(lat: float, lon: float, days: int = 3):
         "latitude": lat,
         "longitude": lon,
         "current": ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"],
-        "hourly": ["temperature_2m", "wind_speed_10m", "wind_gusts_10m", "precipitation", "wind_direction_10m"],
+        "hourly": [
+            "temperature_2m",
+            "wind_speed_10m",
+            "wind_gusts_10m",
+            "precipitation",
+            "wind_direction_10m",
+            "wind_speed_180m",
+            "wind_direction_180m"
+        ],
         "forecast_days": days,
         "timezone": "auto"
     }
@@ -91,7 +98,7 @@ for spot in spots:
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Température", f"{temp} °C")
-        c2.metric("Vent moyen", f"{wind} km/h", delta=f"{wind_dir}°", delta_color="off")
+        c2.metric("Vent sol (10m)", f"{wind} km/h", delta=f"{wind_dir}°", delta_color="off")
         c3.metric("Rafales", f"{gusts} km/h")
 
         # Statut instantané
@@ -102,7 +109,7 @@ for spot in spots:
         else:
             st.error("❌ **Conditions actuelles défavorables**")
 
-        # Filtrage et mise en forme selon l'horizon sélectionné
+        # Filtrage horaire
         hourly = data.get("hourly", {})
         df_hourly = pd.DataFrame(hourly)
         df_hourly["time"] = pd.to_datetime(df_hourly["time"])
@@ -111,26 +118,59 @@ for spot in spots:
         nb_heures = horizon * 24
         df_next = df_hourly[df_hourly["time"] >= now].head(nb_heures).copy()
 
-        # Évaluation de la volabilité par heure
+        # Évaluation du vol et explication détaillée des rejets
         def eval_flight(row):
-            w = row["wind_speed_10m"]
-            g = row["wind_gusts_10m"]
+            w10 = row["wind_speed_10m"]
+            g10 = row["wind_gusts_10m"]
             p = row["precipitation"]
-            if w <= 18 and g <= 25 and p == 0:
-                return "🟢 Volable"
-            elif w <= 22 and g <= 30 and p == 0:
-                return "🟠 Limite"
-            else:
-                return "🔴 Non volable"
+            w180 = row.get("wind_speed_180m", 0)
 
-        df_next["Volabilité"] = df_next.apply(eval_flight, axis=1)
-        
-        # Ajout du nom du jour en français (ex: "Jeudi 27/08 14:00")
+            rejets = []
+            if p > 0:
+                rejets.append(f"Pluie ({p:.1f} mm)")
+            if w10 > 18:
+                rejets.append(f"Vent 10m > 18 km/h ({w10:.0f})")
+            if g10 > 25:
+                rejets.append(f"Rafales > 25 km/h ({g10:.0f})")
+            if w180 > 25:
+                rejets.append(f"Vent 180m > 25 km/h ({w180:.0f})")
+
+            if not rejets:
+                return "🟢 Volable", "-"
+            elif w10 <= 22 and g10 <= 30 and w180 <= 30 and p == 0:
+                return "🟠 Limite", ", ".join(rejets)
+            else:
+                return "🔴 Non volable", ", ".join(rejets)
+
+        eval_res = df_next.apply(eval_flight, axis=1)
+        df_next["Volabilité"] = [r[0] for r in eval_res]
+        df_next["Cause(s) de rejet"] = [r[1] for r in eval_res]
+
+        # Format du jour et de l'heure
         df_next["Nom_Jour"] = df_next["time"].dt.dayofweek.map(lambda x: JOURS_FR[x])
         df_next["Jour & Heure"] = df_next["Nom_Jour"] + " " + df_next["time"].dt.strftime("%d/%m %H:00")
         
-        display_df = df_next[["Jour & Heure", "Volabilité", "wind_speed_10m", "wind_gusts_10m", "precipitation", "wind_direction_10m"]].copy()
-        display_df.columns = ["Jour & Heure", "Statut", "Vent (km/h)", "Rafales (km/h)", "Pluie (mm)", "Dir. (°)"]
+        display_df = df_next[[
+            "Jour & Heure",
+            "Volabilité",
+            "wind_speed_10m",
+            "wind_gusts_10m",
+            "wind_speed_180m",
+            "precipitation",
+            "wind_direction_10m",
+            "Cause(s) de rejet"
+        ]].copy()
+        
+        display_df.columns = [
+            "Jour & Heure",
+            "Statut",
+            "Vent 10m (km/h)",
+            "Rafales (km/h)",
+            "Vent 180m (km/h)",
+            "Pluie (mm)",
+            "Dir. (°)",
+            "Cause(s) de rejet"
+        ]
 
         st.markdown(f"**📅 Prévisions sur {horizon} jour{'s' if horizon > 1 else ''} :**")
         st.dataframe(display_df, use_container_width=True, hide_index=True)
